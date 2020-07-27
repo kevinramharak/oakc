@@ -418,43 +418,52 @@ machine_divide:
 ;; std.ok defines a small std library, there are some foreign function calls inside that have to be defined
 ;; pop 2 values, compare and push the logical result
 ;; void lt!(x, y)
+;; NOTE: first pop will retreive the first argument
 lt:
     PUSH A
-    PUSH B
+    PUSH X
+    PUSH Y
     PUSH BP
     MOV BP, SP
     CALL machine_pop
-    MOV B, A
+    MOV X, A
     CALL machine_pop
-    CMP A, B
-    JGE lt_false
-    PUSH 1
-    JMP lt_return
+    MOV Y, A
+    CMP X, Y
+    JL lt_true
 lt_false:
     PUSH 0
+    JMP lt_return
+lt_true:
+    PUSH 1
 lt_return:
     CALL machine_push
     MOV SP, BP
     POP BP
-    POP B
+    POP Y
+    POP X
     POP A
     RET
 
 ;; void le!(x, y)
+;; NOTE: first pop will retreive the first argument
 le:
     PUSH A
-    PUSH B
+    PUSH X
+    PUSH Y
     PUSH BP
     MOV BP, SP
     CALL machine_pop
-    MOV B, A
+    MOV X, A
     CALL machine_pop
-    CMP A, B
-    JG le_false
-    PUSH 1
-    JMP le_return
+    MOV Y, A
+    CMP X, Y
+    JLE le_true
 le_false:
     PUSH 0
+    JMP le_return
+le_true:
+    PUSH 1
 le_return:
     CALL machine_push
     MOV SP, BP
@@ -464,20 +473,24 @@ le_return:
     RET
 
 ;; void gt!(x, y)
+;; NOTE: first pop will retreive the first argument
 gt:
     PUSH A
-    PUSH B
+    PUSH X
+    PUSH Y
     PUSH BP
     MOV BP, SP
     CALL machine_pop
-    MOV B, A
+    MOV X, A
     CALL machine_pop
-    CMP A, B
-    JLE gt_false
-    PUSH 1
-    JMP gt_return
+    MOV Y, A
+    CMP X, Y
+    JG gt_true
 gt_false:
     PUSH 0
+    JMP gt_return
+gt_true:
+    PUSH 1
 gt_return:
     CALL machine_push
     MOV SP, BP
@@ -487,20 +500,24 @@ gt_return:
     RET
 
 ;; void ge!(x, y)
+;; NOTE: first pop will retreive the first argument
 ge:
     PUSH A
-    PUSH B
+    PUSH X
+    PUSH Y
     PUSH BP
     MOV BP, SP
     CALL machine_pop
-    MOV B, A
+    MOV X, A
     CALL machine_pop
-    CMP A, B
-    JL ge_false
-    PUSH 1
-    JMP ge_return
+    MOV Y, A
+    CMP X, Y
+    JGE ge_true
 ge_false:
     PUSH 0
+    JMP ge_return
+ge_true:
+    PUSH 1
 ge_return:
     CALL machine_push
     MOV SP, BP
@@ -547,30 +564,41 @@ prs_break:
 ;; no negative numbers, no bound checks
 prn:
     PUSH A
+    PUSH B
     PUSH Y
     PUSH BP
     MOV BP, SP
     CALL machine_pop  ; pop value into
+    MOV B, prn_buffer ; char * loc = &prn_buffer
+    ADD B, 4          ; loc += 4 // move to the end of the buffer, but before the null terminator
 prn_loop:
     CMP A, 10         ; while (value >= 10)
     JL prn_break
     MOV Y, 0         ; zero out Y for the DIV op
     DIV 10           ; divide by 10, result in A, remainder in Y
     ADD Y, 0x30      ; convert remainder to ascii character
-    PUSH Y
-    CALL machine_push ; push it on the stack
-    CALL prc
+    MOV [B], Y       ;
+    DEC B
     JMP prn_loop
 prn_break:
     ADD A, 0x30
-    PUSH A
+    MOV [B], A
+prn_loop_prc:
+    CMP [B], 0
+    JZ prn_return
+    PUSH [B]
     CALL machine_push
     CALL prc
+    INC B
+    JMP prn_loop_prc
+prn_return:
     MOV SP, BP
     POP BP
     POP Y
+    POP B
     POP A
     RET
+prn_buffer: DW 6 DUP(0x00) ; space for 5 character + '\0'
 
 ;; void prc!(ch)
 ;; TODO: use smarter logic to use the full 40 word buffer instead of cheesing it with sleep

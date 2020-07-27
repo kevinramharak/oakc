@@ -1,4 +1,5 @@
 /target
+/mar/*.mar
 Cargo.lock
 *.exe
 .vscode

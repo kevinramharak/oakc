@@ -1,4 +1,4 @@
-use oakc::{compile, Go, C};
+use oakc::{compile, Go, C, MAR};
 use std::{fs::read_to_string, path::PathBuf, process::exit};
 
 use clap::{clap_app, crate_authors, crate_version, AppSettings::ArgRequiredElseHelp};
@@ -14,6 +14,7 @@ fn main() {
         (@group target =>
             (@arg c: -c "Compile with C backend")
             (@arg go: -g --go "Compile with Golang backend")
+            (@arg mar: --mar "Compile with MAR backend")
         )
     )
     .setting(ArgRequiredElseHelp)
@@ -45,6 +46,8 @@ fn main() {
                 compile(&cwd, contents, C)
             } else if matches.is_present("go") {
                 compile(&cwd, contents, Go)
+            } else if matches.is_present("mar") {
+                compile(&cwd, contents, MAR)
             } else {
                 compile(&cwd, contents, C)
             };

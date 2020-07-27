@@ -9,7 +9,7 @@ pub mod mir;
 use hir::HirProgram;
 
 mod target;
-pub use target::{Go, Target, C};
+pub use target::{Go, Target, C, MAR};
 
 use asciicolor::Colorize;
 use comment::cpp::strip;

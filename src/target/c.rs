@@ -96,9 +96,9 @@ impl Target for C {
                 .arg(format!("main{}", EXE_SUFFIX))
                 .output()
             {
-                if let Ok(_) = remove_file("OUTPUT.c") {
+                //if let Ok(_) = remove_file("OUTPUT.c") {
                     return true;
-                }
+                //}
             }
         }
         false

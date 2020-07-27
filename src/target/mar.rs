@@ -2,6 +2,7 @@ use super::Target;
 use std::{
     env::consts::EXE_SUFFIX,
     fs::{remove_file, write, read},
+    io::{Error, ErrorKind, Result, Write},
     process::Command,
 };
 
@@ -120,10 +121,11 @@ end_while_{}:
         str
     }
 
-    fn compile(&self, code: String) -> bool {
+    fn compile(&self, code: String) -> Result<()> {
         if let Ok(_) = write("OUTPUT.mar", code) {
-            return true
+            return Result::Ok(())
         }
-        return false
+        return Result::Err(Error::new(ErrorKind::Other,
+            "unabe to compile to MAR"));
     }
 }

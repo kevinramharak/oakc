@@ -394,6 +394,8 @@ machine_allocate_loop_mark:
     INC B
     JMP machine_allocate_loop_mark
 machine_allocate_ret:
+    PUSH Y
+    CALL machine_push
     MOV SP, BP
     POP BP
     POP Y

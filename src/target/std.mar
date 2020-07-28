@@ -220,10 +220,10 @@ _wake:                      ;; execution will resume here
 STACK_HEAP_COLLISION EQU 1
 NO_FREE_MEMORY EQU 2
 STACK_UNDERFLOW EQU 3
-_panic_default_message: DW "ERR_UNKNOWN", 0 ;; 12 length
-_panic_stack_heap_collision: DW "ERR_STACK_HEAP_COLLISION", 0 ;; 25 length
-_panic_no_free_memory: DW "ERR_NO_FREE_MEMORY", 0 ;; 21 length
-_panic_stack_underflow: DW "ERR_STACK_UNDERFLOW", 0 ;; 20 length
+_panic_default_message: DW "\nERR_UNKNOWN", 0 ;; 13 length
+_panic_stack_heap_collision: DW "\nERR_STACK_HEAP_COLLISION", 0 ;; 26 length
+_panic_no_free_memory: DW "\nERR_NO_FREE_MEMORY", 0 ;; 22 length
+_panic_stack_underflow: DW "\nERR_STACK_UNDERFLOW", 0 ;; 21 length
 _panic:
     PUSH BP
     MOV BP, SP
@@ -244,10 +244,9 @@ _panic_case_3:
     CMP A, 3
     JMP _panic_spin
     MOV C, _panic_stack_underflow
+    PUSH C
+    CALL _comport_self_out_write
 _panic_spin:
-    MOV A, COMPORT_SELF_OUT
-    MOV X, C
-    HWI HWID_COMPORT
     CALL _sleep
     JMP _panic_spin
 

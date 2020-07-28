@@ -234,16 +234,17 @@ _panic_case_1:
     CMP A, 1
     JNZ _panic_case_2
     MOV C, _panic_stack_heap_collision
-    JMP _panic_spin
+    JMP _panic_end
 _panic_case_2:
     CMP A, 2
     JNZ _panic_case_3
     MOV C, _panic_no_free_memory
-    JMP _panic_spin
+    JMP _panic_end
 _panic_case_3:
     CMP A, 3
-    JMP _panic_spin
+    JNZ _panic_end
     MOV C, _panic_stack_underflow
+_panic_end:
     PUSH C
     CALL _comport_self_out_write
 _panic_spin:
@@ -386,7 +387,7 @@ machine_allocate_loop_break:
     JLE machine_allocate_loop_panic
     MOV B, 0                   ; i = 0
 machine_allocate_loop_mark:
-    CMP B, A                   ; while ( i < size)
+    CMP B, A                   ; while (i < size)
     JGE machine_allocate_ret
     MOV D, C                   ; int * loc = machine->allocated
     ADD D, B                   ; loc += i
@@ -835,14 +836,18 @@ getch:
     PUSH BP
     MOV BP, SP
 getch_fetch:
-    MOV A, 1   ; KEYBOARD_FETCH_KEY
-    HWI 0x0004 ; hwid of the keyboard
-    ;; result in B
+    MOV A, KEYBOARD_FETCH_KEY
+    HWI HWID_KEYBOARD
     CMP B, 0   ; if the result is zero there was no character in the keyboard buffer
-    JNZ getch_ret
+    JNZ getch_newline_check
     CALL _sleep ; to prevent spinning and draining the server / have the server terminate our execution we use sleep
     JMP getch_fetch
-getch_ret:
+getch_newline_check:
+    ;; NOTE: oakc examples ignore '\r' and work with '\n' characters, so we do a switcheroo
+    CMP B, 13 ;; if key is a '\r' character, replace it with a '\n' character
+    JNZ getch_return
+    MOV B, 10
+getch_return:
     PUSH B
     CALL machine_push
     MOV SP, BP

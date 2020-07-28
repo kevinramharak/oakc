@@ -32,7 +32,7 @@ main:
     fn end_entry_point(&self) -> String {
         String::from(
 r##"    RET
-HEAP_START:
+_HEAP_START:
 "##)
     }
 

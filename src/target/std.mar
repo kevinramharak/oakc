@@ -1,51 +1,186 @@
+;; constants
+;*************************** Hardware IDs
+HWID_LEGS     equ 0x1
+HWID_LASER    equ 0x2
+HWID_LIDAR    equ 0x3
+HWID_KEYBOARD equ 0x4
+HWID_DRILL    equ 0x5
+HWID_INV      equ 0x6
+HWID_RNG      equ 0x7
+HWID_CLOCK    equ 0x8
+HWID_HOLO     equ 0x9
+HWID_BATTERY  equ 0xA
+HWID_FLOPPY   equ 0xB
+HWID_RADIO    equ 0xC
+HWID_COMPORT  equ 0xD
+
+;*************************** Drill actions IDs
+DRILL_POLL        equ 1
+DRILL_GATHER      equ 2
+; Drill status
+DRILL_STATUS_OK   equ 0
+DRILL_STATUS_BUSY equ 1
+
+;*************************** Inventory actions IDs
+INV_CLEAR equ 0
+INV_POLL  equ 1
+
+;*************************** Laser actions IDs
+LASER_WITHDRAW equ 1
+LASER_DEPOSIT  equ 2
+
+;*************************** Legs actions IDs
+LEGS_SET_DIRECTION          equ 1
+LEGS_SET_DIRECTION_AND_WALK equ 2
+; Legs directions
+LEGS_DIR_NORTH equ 0
+LEGS_DIR_EAST  equ 1
+LEGS_DIR_SOUTH equ 2
+LEGS_DIR_WEST  equ 3
+
+;*************************** LiDAR actions IDs
+LIDAR_GET_POS       equ 1
+LIDAR_GET_PATH      equ 2
+LIDAR_GET_MAP       equ 3
+LIDAR_GET_WORLD_POS equ 4
+
+;*************************** Keyboard actions IDs
+KEYBOARD_CLEAR     equ 0
+KEYBOARD_FETCH_KEY equ 1
+
+;*************************** Hologram Projector actions IDs
+HOLO_CLEAR          equ 0
+HOLO_DISPLAY_HEX    equ 1
+HOLO_DISPLAY_STRING equ 2
+HOLO_DISPLAY_DEC    equ 3
+HOLO_DISPLAY_COLOR  equ 4
+
+;*************************** Battery actions IDs
+BATTERY_POLL             equ 1
+BATTERY_GET_MAX_CAPACITY equ 2
+
+;*************************** Random Number Generator actions IDs
+RNG_POLL equ 0
+
+;*************************** Clock actions IDs
+CLOCK_POLL equ 0
+
+;*************************** Floppy Disk actions IDs
+FLOPPY_POLL         equ 1
+FLOPPY_READ_SECTOR  equ 2
+FLOPPY_WRITE_SECTOR equ 3
+
+;*************************** Radio actions IDs
+RADIO_LISTEN equ 1
+
+;*************************** Com Port actions IDs
+COMPORT_BUFFER_CLEAR   equ 0
+COMPORT_POLL           equ 1
+COMPORT_FRONT_PORT_OUT equ 2
+COMPORT_SELF_OUT       equ 3
+COMPORT_CONSOLE_CLEAR  equ 4
+
+;*************************** Keys IDs
+KEY_ESC   equ 0x1b
+KEY_SPACE equ 0x20
+KEY_ENTER equ 0xd
+KEY_0     equ 0x30
+KEY_1     equ 0x31
+KEY_2     equ 0x32
+KEY_3     equ 0x33
+KEY_4     equ 0x34
+KEY_5     equ 0x35
+KEY_6     equ 0x36
+KEY_7     equ 0x37
+KEY_8     equ 0x38
+KEY_9     equ 0x39
+KEY_A     equ 0x41
+KEY_B     equ 0x42
+KEY_C     equ 0x43
+KEY_D     equ 0x44
+KEY_E     equ 0x45
+KEY_F     equ 0x46
+KEY_G     equ 0x47
+KEY_H     equ 0x48
+KEY_I     equ 0x49
+KEY_J     equ 0x4a
+KEY_K     equ 0x4b
+KEY_L     equ 0x4c
+KEY_M     equ 0x4d
+KEY_N     equ 0x4e
+KEY_O     equ 0x4f
+KEY_P     equ 0x50
+KEY_Q     equ 0x51
+KEY_R     equ 0x52
+KEY_S     equ 0x53
+KEY_T     equ 0x54
+KEY_U     equ 0x55
+KEY_V     equ 0x56
+KEY_W     equ 0x57
+KEY_X     equ 0x58
+KEY_Y     equ 0x59
+KEY_Z     equ 0x5a
+
+;*************************** Items IDs
+ITEM_BIOMASS equ 1
+ITEM_IRON    equ 3
+ITEM_COPPER  equ 4
+
+;; Setting the binary offset to 0 makes sure our .data section starts at binary address 0, default would be 200
+ORG 0
+
 ;; data segment - for now assumed that .data starts at adress 0x00
+_0x0000:
 .data
-    DW 50 DUP(0x00) ; padding to be able to adress the following 3 labels
+    ;; _sleep variables
+    _should_wake:  DW 0x0000
+    _BP_cache: DW 0x0000
+    _SP_cache: DW 0x0000
+
+    ;; padding to be able to adress the following 3 labels
+    DW 0x4D DUP(0x1234)
+
+    ;; 3 words reserved for execution cost variables. These are set by the server executing the code
     ;; see https://github.com/simon987/Much-Assembly-Required/blob/master/Server/src/main/java/net/simon987/server/assembly/CPU.java#L194
     EXECUTION_COST_ADDR: DW 0x0000
     ;; 32 bit signed integer
     EXECUTED_INSTRUCTION_COUNT_HIGHER: DW 0x0000
     EXECUTED_INSTRUCTION_COUNT_LOWER: DW 0x0000
 
-    ;; TODO: these variables can be moved into the first 50 words
-    ;; _sleep variables
-    should_wake:  DW 0x0000
-    BP_cache: DW 0x0000
-    SP_cache: DW 0x0000
-
-;; default origin of .text is 0x200, can be manipulated with ORG directive
 ;; execution on a server tick always starts at .text, on a server reset memory will be cleared
+_0x0053:
 .text
     ;; if flag is set restore from previous sleep call
-    CMP [should_wake], 1
+    CMP [_should_wake], 1
     JZ _wake
-    ;; else spin up a vm implementation
+
+    ;; else intialize the vm
     CALL machine_new
 
     ;; call main
-    ;; could push int argc, char ** argv, char ** env on the stack?
     CALL main
     ;; if returning from main spin with a sleep call
 _spin:
     CALL _sleep
     JMP _spin
 
-;; simple debug function to print a value to the buffer
+;; simple debug function to print a value to stdout
 _debug:
-    MOV [_debuf_buffer], A
+    MOV [_debug_buffer], A
+    MOV A, COMPORT_SELF_OUT
+    MOV X, _debug_buffer
 _debug_loop:
-    MOV A, 3
-    MOV X, _debuf_buffer
-    HWI 0x000D
+    HWI HWID_COMPORT
     CALL _sleep
     JMP _debug_loop
-_debuf_buffer: DW 8 DUP(0x20)
+_debug_buffer: DW 8 DUP(0x20)
 
 ;; sleep and wake implementation
 ;; allows to control execution start each server tick
 ;; if sleep isnt used, execution will always start at .text
+;; we also use sleep to know when to copy our internal com port buffer
 _sleep:
-    ;; not sure if registers are preserved between each game tick, sleep will preserve all state
+    ;; not sure if registers are preserved between each game tick, so sleep will preserve all state
     PUSHF                   ;; store flags
     PUSH A                  ;; store registers
     PUSH B
@@ -53,14 +188,14 @@ _sleep:
     PUSH D
     PUSH X
     PUSH Y
-    MOV [BP_cache], BP      ;; store stack base pointer and stack pointer
-    MOV [SP_cache], SP
-    MOV [should_wake], 1    ;; set the flag
-    BRK                     ;; wait till next tick
+    MOV [_BP_cache], BP      ;; store stack base pointer and stack pointer
+    MOV [_SP_cache], SP
+    MOV [_should_wake], 1    ;; set the flag
+    BRK                     ;; wait till until next tick
 _wake:                      ;; execution will resume here
-    MOV [should_wake], 0    ;; clear the flag
-    MOV SP, [SP_cache]      ;; restore stack base pointer and stack pointer
-    MOV BP, [BP_cache]
+    MOV [_should_wake], 0    ;; clear the flag
+    MOV SP, [_SP_cache]      ;; restore stack base pointer and stack pointer
+    MOV BP, [_BP_cache]
     POP Y                   ;; restore registers
     POP X
     POP D
@@ -76,10 +211,10 @@ _wake:                      ;; execution will resume here
 STACK_HEAP_COLLISION EQU 1
 NO_FREE_MEMORY EQU 2
 STACK_UNDERFLOW EQU 3
-_panic_default_message: DW "unkown error code", 0
-_panic_stack_heap_collision: DW "stack and heap collision during push", 0
-_panic_no_free_memory: DW "no free memory left", 0
-_panic_stack_underflow: DW "stack underflow", 0
+_panic_default_message: DW "ERR_UNKNOWN", 0 ;; 12 length
+_panic_stack_heap_collision: DW "ERR_STACK_HEAP_COLLISION", 0 ;; 25 length
+_panic_no_free_memory: DW "ERR_NO_FREE_MEMORY", 0 ;; 21 length
+_panic_stack_underflow: DW "ERR_STACK_UNDERFLOW", 0 ;; 20 length
 _panic:
     PUSH BP
     MOV BP, SP
@@ -101,17 +236,19 @@ _panic_case_3:
     JMP _panic_spin
     MOV C, _panic_stack_underflow
 _panic_spin:
-    MOV A, 3
+    MOV A, COMPORT_SELF_OUT
     MOV X, C
-    HWI 0x000D
+    HWI HWID_COMPORT
     CALL _sleep
     JMP _panic_spin
 
-;; TODO: the memory allocation is really primitive, definitly need something more effecient
 ;; virtual machine implementation
 ;; based on the vm implementation in 'std.c'
-STACK_START equ 0xffff ; stack pointer starts at mem[65535] goes towards mem[0]
+;; NOTE: so we do some math to get the amount of adresses between after the binary code instructions until the stack pointer
+_STACK_START equ 0xffff ; stack pointer starts at mem[65535] goes towards mem[0]
 ; heap_start: dw 0 ; is a label generated at the end 
+; _HEAP_START: DW 0 ;; is generated at the end
+; SP ; should point to the top of the stack. without any pushes and/or pops it should be 2 ^ 16 - 1
 ;; struct machine {}
 machine_memory: DW 0x0000 ; int * memory
 machine_allocated: DW 0x0000 ; bool * allocated
@@ -119,13 +256,13 @@ machine_capacity: DW 0x0000 ; int capacity
 machine_stack_ptr: DW 0x0000 ; int stack_ptr
 machine_new: ; machine * machine_new ( int var, int capacity )
     ;; TODO: write an heap implementation that doesnt have a 100% memory overhead
-    MOV A, STACK_START
-    SUB A, HEAP_START ; memory open to use
+    MOV A, _STACK_START
+    SUB A, _HEAP_START ; memory open to use
     SUB A, 0x1000     ; keep 0x1000 open for the stack ;; TODO: make sure stack and heap dont colide
     SHR A, 1          ; divide it by 2
-    MOV [machine_capacity], A           ;; so capacity is (STACK_START - HEAP_START) / 2
-    MOV [machine_memory], HEAP_START    ;; machine->memory is a pointer to the HEAP_START address
-    MOV [machine_allocated], HEAP_START ;; machine->allocated  is a pointer to the HEAP_START address with an offset of (STACK_START - HEAP_START) / 2
+    MOV [machine_capacity], A           ;; so capacity is (STACK_START - _HEAP_START) / 2
+    MOV [machine_memory], _HEAP_START    ;; machine->memory is a pointer to the _HEAP_START address
+    MOV [machine_allocated], _HEAP_START ;; machine->allocated  is a pointer to the _HEAP_START address with an offset of (STACK_START - _HEAP_START) / 2
     ADD [machine_allocated], [machine_capacity]
     ;; compiler figures out maximum stack size and defines it as a constant
     ;; the c impl does a for loop with push(0) for this size, but the end result is the same as setting the stack ptr to this size
@@ -526,12 +663,8 @@ ge_return:
     POP A
     RET
 
-;; pop a value and print it
+;; pop a value and print it at a string
 ;; void prs!(s)
-;; NOTE: The internal buffer can contain up to 40 words
-;; NOTE: Will copy 8 words each HWI
-;; TODO: probably easier to write our own buffer logic to make writes consistant between ticks
-;; TODO: write strings instead of deligating to prc
 ;; https://github.com/simon987/Much-Assembly-Required/wiki/(Hardware)-Universal-Com-Port
 prs:
     PUSH A
@@ -540,16 +673,15 @@ prs:
     PUSH BP
     MOV BP, SP
     MOV B, [machine_memory]     ; int * loc = machine->memory
-    CALL machine_pop            ; int addr = machine_pop()
+    CALL machine_pop            ; int offset = machine_pop()
+    ADD B, A                    ; loc += offset
 prs_loop:
-    MOV C, B 
-    ADD C, A                    ; loc += addr
-    CMP [C], 0                  ; while (*loc !== 0)
+    CMP [B], 0                  ; while (*loc !== 0)
     JZ prs_break
-    PUSH [C]
+    PUSH [B]                    ;   prc!(*loc)
     CALL machine_push
     CALL prc
-    INC A                       ;  addr++
+    INC B                       ;   loc++
     JMP prs_loop
 prs_break:
     MOV SP, BP
@@ -610,9 +742,9 @@ prc:
     MOV BP, SP
     CALL machine_pop
     MOV [prc_static_buffer], A
-    MOV A, 3 ;; COMPORT_SELF_OUT
+    MOV A, COMPORT_SELF_OUT
     MOV X, prc_static_buffer ;; address of 8 words to copy
-    HWI 0x000D ;; hwid of UCP
+    HWI HWID_COMPORT
     CALL _sleep ;; cheese it to write 1 character each tick
     MOV SP, BP
     POP BP
@@ -662,4 +794,4 @@ getch_ret:
 ;; generated code ends here with a `RET` instruction
 
 ;; after the generated code
-; HEAP_START: DW 0 ; label to where the heap should start
+; _HEAP_START: DW 0 ; label to where the heap should start

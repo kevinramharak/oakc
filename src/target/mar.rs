@@ -114,7 +114,7 @@ r#"begin_while_{}:
 
     fn end_while(&self) -> String {
         let str = String::from(format!(
-r#"   JMP begin_while_{}
+r#"    JMP begin_while_{}
 end_while_{}:
 "#, unsafe { unique - nested }, unsafe { unique - nested }));
         unsafe { nested -= 1; }

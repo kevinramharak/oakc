@@ -125,6 +125,10 @@ end_while_{}:
         str
     }
 
+    fn get_name(&self) -> char {
+        'c'
+    }
+
     fn compile(&self, code: String) -> Result<()> {
         if let Ok(_) = write("OUTPUT.mar", code) {
             return Result::Ok(())

@@ -126,7 +126,7 @@ end_while_{}:
     }
 
     fn get_name(&self) -> char {
-        'c'
+        'm'
     }
 
     fn compile(&self, code: String) -> Result<()> {

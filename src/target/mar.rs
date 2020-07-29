@@ -51,6 +51,10 @@ r##"    PUSH {}
         String::from("    CALL machine_subtract\n")
     }
 
+    fn sign(&self) -> String {
+        String::from("    CALL machine_sign\n")
+    }
+
     fn multiply(&self) -> String {
         String::from("    CALL machine_multiply\n")
     }

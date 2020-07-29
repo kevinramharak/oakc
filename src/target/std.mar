@@ -595,6 +595,29 @@ machine_subtract:
     POP A
     RET
 
+;; void machine_sign()
+;; pop a value of the stack, if it is 0 or greater push 1, else push -1
+machine_sign:
+    PUSH A
+    PUSH B
+    PUSH BP
+    MOV BP, SP
+    CALL machine_pop
+    CMP A, 0
+    JGE machine_sign_ge
+machine_sign_l:
+    PUSH -1
+    JMP machine_sign_push
+machine_sign_ge:
+    PUSH 1
+machine_sign_push:
+    CALL machine_push
+    MOV SP, BP
+    POP BP
+    POP B
+    POP A
+    RET
+
 ;; void machine_multiply()
 ;; pop 2 values, multiply them and push the result
 machine_multiply:

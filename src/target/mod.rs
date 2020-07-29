@@ -6,6 +6,8 @@ mod mar;
 pub use mar::MAR;
 
 pub trait Target {
+    fn get_name(&self) -> char;
+
     fn prelude(&self) -> String;
     fn postlude(&self) -> String;
 

@@ -1,3 +1,6 @@
+;; std.mar
+;; standard library implementation
+
 ;; void _comport_self_out_flush()
 ;; flush comport buffer to the hardware
 ;; called before _sleep executes a BRK instruction

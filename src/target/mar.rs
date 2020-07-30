@@ -13,8 +13,8 @@ pub struct MAR;
 
 impl Target for MAR {
     fn prelude(&self) -> String {
-        let runtime = read("src/target/mar/runtime.mar").unwrap();
-        let std = read("src/target/mar/std.mar").unwrap();
+        let runtime = read("src/target/core/core.mar").unwrap();
+        let std = read("src/target/std/std.mar").unwrap();
         let buffer = [runtime, std].concat();
         String::from_utf8(buffer).unwrap()
     }

@@ -1,0 +1,181 @@
+;; void _comport_self_out_flush()
+;; flush comport buffer to the hardware
+;; called before _sleep executes a BRK instruction
+_comport_self_out_flush:
+    PUSH A
+    PUSH B
+    PUSH X
+    PUSH BP
+    MOV BP, SP
+    ;; setup comport hardware interupt parameters
+    MOV A, COMPORT_SELF_OUT
+    MOV X, _comport_self_out_buffer   ; const char * str = _comport_self_out_buffer
+_comport_self_out_flush_loop:
+    ;; NOTE: since the length is stored right after the buffer we can use its pointer to check if we are past the buffer contents
+    CMP X, _comport_self_out_length   ; while (str != _comport_self_out_length)
+    JZ _comport_self_out_flush_return
+    HWI HWID_COMPORT                  ;     hwi(HWID_COMPORT, COMPORT_SELF_OUT, str)
+    MOV B, 0                          ; int i = 0
+_comport_self_out_flush_clear:
+    CMP B, 8                          ; while (i < 8)
+    JZ _comport_self_out_flush_loop
+    MOV [X], 0                        ;     *str = '\0'
+    INC X                             ;      str++
+    INC B                             ;      i++
+    JMP _comport_self_out_flush_clear
+_comport_self_out_flush_return:
+    MOV [_comport_self_out_length], 0 ; clear the length of the comport_self_out buffer
+    MOV SP, BP
+    POP BP
+    POP X
+    POP B
+    POP A
+    RET
+
+;; void _comport_self_out_write(const char * str)
+;; write a null terminated string to the comport buffer
+;; if the buffer is full call _sleep to flush the buffer and wait till the new tick clears the hardware
+_comport_self_out_write:
+    PUSH A
+    PUSH B
+    PUSH BP
+    MOV BP, SP
+    ;; [BP] - old SP
+    ;; [BP + 1] - ret
+    ;; [BP + 2] - B
+    ;; [BP + 3] - A
+    ;; [BP + 4] - const char * str
+    MOV A, [BP + 4]
+    MOV B, _comport_self_out_buffer
+    ADD B, [_comport_self_out_length]
+_comport_self_out_write_loop:
+    CMP [_comport_self_out_length], 40 ;; if the buffer is full flush and sleep till next tick
+    JL _comport_self_out_write_writing
+    CALL _comport_self_out_flush       ;; _sleep implicitly calls flush if the buffer is not empty, but we'd rather spell it out explicit
+    CALL _sleep
+    MOV B, _comport_self_out_buffer
+_comport_self_out_write_writing:
+    CMP [A], 0                         ;; while (*str !== 0)
+    JZ _comport_self_out_write_return
+    MOV [B], [A]
+    INC B
+    INC A
+    INC [_comport_self_out_length]
+    JMP _comport_self_out_write_loop
+_comport_self_out_write_return:
+    MOV SP, BP
+    POP BP
+    POP B
+    POP A
+    RET 1
+
+;; pop a value and print it at a string
+;; void prs!(s)
+;; https://github.com/simon987/Much-Assembly-Required/wiki/(Hardware)-Universal-Com-Port
+prs:
+    PUSH A
+    PUSH B
+    PUSH BP
+    MOV BP, SP
+    MOV B, [machine_memory]     ; int * loc = machine->memory
+    CALL machine_pop            ; int offset = machine_pop()
+    ADD B, A                    ; loc += offset
+    PUSH B
+    CALL _comport_self_out_write
+prs_break:
+    MOV SP, BP
+    POP BP
+    POP B
+    POP A
+    RET
+
+;; void prn!(n)
+;; implementation from: https://stackoverflow.com/a/3982700
+;; no negative numbers, no bound checks
+prn:
+    PUSH A
+    PUSH B
+    PUSH Y
+    PUSH BP
+    MOV BP, SP
+    CALL machine_pop  ; pop value into
+    MOV B, prn_buffer ; char * loc = &prn_buffer
+    ADD B, 4          ; loc += 4 // move to the end of the buffer, but before the null terminator
+prn_loop:
+    CMP A, 10         ; while (value >= 10)
+    JL prn_break
+    MOV Y, 0         ; zero out Y for the DIV op
+    DIV 10           ; divide by 10, result in A, remainder in Y
+    ADD Y, 0x30      ; convert remainder to ascii character
+    MOV [B], Y       ;
+    DEC B
+    JMP prn_loop
+prn_break:
+    ADD A, 0x30
+    MOV [B], A
+prn_loop_prc:
+    PUSH B
+    CALL _comport_self_out_write
+prn_return:
+    MOV SP, BP
+    POP BP
+    POP Y
+    POP B
+    POP A
+    RET
+prn_buffer: DW 6 DUP(0x00) ; space for 5 character + '\0'
+
+;; void prc!(ch)
+;; TODO: use smarter logic to use the full 40 word buffer instead of cheesing it with sleep
+prc:
+    PUSH A
+    PUSH BP
+    MOV BP, SP
+    CALL machine_pop
+    MOV [prc_buffer], A
+    PUSH prc_buffer
+    CALL _comport_self_out_write
+    MOV SP, BP
+    POP BP
+    POP A
+    RET
+prc_buffer: DW 2 DUP(0x00) ;; snice the second word is never written to, this will always be a string with 1 character + null terminator
+
+;; this function seems to be missing from std.ok, but is used in a few files
+;; it prints a newline
+;; void prend!()
+prend:
+    PUSH 10 ; '\n'
+    CALL machine_push
+    CALL prc
+    RET
+
+;; retrieve a character from stdin and push it on the stack
+;; void getch!()
+;; NOTE: seems like getch is expected to block so we emulate that behaviour
+;; https://github.com/simon987/Much-Assembly-Required/wiki/(Hardware)-Keyboard
+getch:
+    PUSH A
+    PUSH B
+    PUSH BP
+    MOV BP, SP
+getch_fetch:
+    MOV A, KEYBOARD_FETCH_KEY
+    HWI HWID_KEYBOARD
+    CMP B, 0   ; if the result is zero there was no character in the keyboard buffer
+    JNZ getch_newline_check
+    CALL _sleep ; to prevent spinning and draining the server / have the server terminate our execution we use sleep
+    JMP getch_fetch
+getch_newline_check:
+    ;; NOTE: oakc examples ignore '\r' and work with '\n' characters, so we do a switcheroo
+    CMP B, 13 ;; if key is a '\r' character, replace it with a '\n' character
+    JNZ getch_return
+    MOV B, 10
+getch_return:
+    PUSH B
+    CALL machine_push
+    MOV SP, BP
+    POP BP
+    POP B
+    POP A
+    RET

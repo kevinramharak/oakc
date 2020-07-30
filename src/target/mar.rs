@@ -7,7 +7,7 @@ use std::{
 };
 
 static mut unique: i16 = 0;
-static mut nested: i16 = 0;
+static mut loop_identifiers: Vec<i16> = Vec::new();
 
 pub struct MAR;
 
@@ -107,23 +107,23 @@ r##"    PUSH {}
     }
 
     fn begin_while(&self) -> String {
-        unsafe { nested += 1; }
+        let id: i16 = unsafe { unique };
+        unsafe { loop_identifiers.push(id); unique += 1; }
         let str = String::from(format!(
 r#"begin_while_{}:
     CALL machine_pop
     CMP A, 0
     JZ end_while_{}
-"#, unsafe { unique }, unsafe { unique }));
-        unsafe { unique += 1 }
+"#, unsafe { id }, unsafe { id }));
         str
     }
 
     fn end_while(&self) -> String {
+        let id = unsafe { loop_identifiers.pop().unwrap() };
         let str = String::from(format!(
 r#"    JMP begin_while_{}
 end_while_{}:
-"#, unsafe { unique - nested }, unsafe { unique - nested }));
-        unsafe { nested -= 1; }
+"#, unsafe { id }, unsafe { id }));
         str
     }
 

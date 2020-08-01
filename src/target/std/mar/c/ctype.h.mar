@@ -1,0 +1,28 @@
+;;/
+;; Implements the C header 'string.h' file in MAR assembly
+;; NOTE: all functions and variables are prefixed with `__c_`
+;; NOTE: all constants are prefixed with `__C_`
+;; Source: https://pubs.opengroup.org/onlinepubs/007908799/xsh/ctype.h.html
+;;         http://www.cplusplus.com/reference/cctype/
+;;/
+
+; int   isalnum(int);
+; int   isalpha(int);
+; int   isascii(int);
+; int   iscntrl(int);
+; int   isdigit(int);
+; int   isgraph(int);
+; int   islower(int);
+; int   isprint(int);
+; int   ispunct(int);
+; int   isspace(int);
+; int   isupper(int);
+; int   isxdigit(int);
+; int   toascii(int);
+; int   tolower(int);
+; int   toupper(int);
+
+; The following are defined as macros:
+
+; int   _toupper(int);
+; int   _tolower(int);

@@ -1,0 +1,5 @@
+
+#[if(!isdef("MAR_COMPORT")) {
+    const MAR_COMPORT = 1;
+    #[extern("comport.mar")]
+}]

@@ -1,0 +1,8 @@
+;; http://www.cplusplus.com/reference/csignal/
+;; NOTE: need the interupt feature to finish before this can be implemented
+
+;; rand can use the random number generator
+
+;; could be nice to conditionally use memory management for the core as well
+
+;; 

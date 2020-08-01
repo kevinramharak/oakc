@@ -1,0 +1,34 @@
+
+// we use the oak compiler itself to generate the actual std.mar file so we its compile time features
+
+// these functions should mimic https://github.com/adam-mcdaniel/oakc/blob/master/src/std.ok
+// until a std lib specification is defined
+
+// current contents: 
+/*
+fn putstr(s: &char) -> void { prs!(s); }
+fn putstrln(s: &char) -> void { putstr(s); prend!(); }
+
+fn putnum(n: num) -> void { prn!(n); }
+fn putnumln(n: num) -> void { putnum(n); prend!(); }
+
+fn putchar(ch: char) -> void { prc!(ch); }
+fn putcharln(ch: char) -> void { putchar(ch); prend!(); }
+
+fn get_char() -> char { return getch!() as char; }
+*/
+
+// print null terminated string
+#[include("oak/prs.mar.ok")]
+
+// print line ending
+// #[include("oak/prend.mar.ok")]
+
+// print number
+// #[include("oak/prn.mar.ok")]
+
+// print character
+// #[include("oak/prc.mar.ok")]
+
+// get a character from stdin (assume blocking execution until we have one)
+// #[include("oak/getch.mar.ok")]

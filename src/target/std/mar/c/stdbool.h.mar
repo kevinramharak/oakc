@@ -1,0 +1,9 @@
+;;/
+;; Implements the C header 'stdbool.h' file in MAR assembly
+;; NOTE: all functions and variables are prefixed with `__c_`
+;; NOTE: all constants are prefixed with `__C_`
+;; Source: http://www.cplusplus.com/reference/cstdbool/
+;;/
+
+__C_true EQU 1
+__C_false EQU 0

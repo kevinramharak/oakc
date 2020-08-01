@@ -1,0 +1,4 @@
+;; http://www.cplusplus.com/reference/cstdio/
+;; big one, stdout should be easy (assuming its the console)
+;; so should stdin be (assuming its the keyboard)
+;; fun starts once we implement a file system on the floppy

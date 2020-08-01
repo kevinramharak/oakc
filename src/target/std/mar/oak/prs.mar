@@ -1,0 +1,70 @@
+;;/
+;; This is a foreign function file used by 'std.ok`.
+;; NOTE: any #[ffi] function defintions are expected to work with the virtual machine instead of normal MAR calling conventions
+;; NOTE: any #[sleeps] functions may call the the `__core_sleep` routine to return after one or more game ticks
+;;/
+
+;; #[sleeps] void __internal_blocking_write_to_console(const char * str, size_t length)
+;; #[dependency="../mar/comport.mar"] for `size_t __mar_comport_write(const char * str, size_t length)`
+;; #[dependency="../mar/comport.mar"] for `int __mar_comport_flush()`
+;; write `length` amount of characters from `str` to the console
+;; does not return until all characters are written to the console
+;; this means it will wait at least 1 game tick to let the internal harware buffer flush to the clientside console
+__internal_blocking_write_to_console:
+    PUSH B
+    PUSH BP
+    MOV BP, SP
+    ;; [BP] = old SP
+    ;; [BP + 1] = old BP
+    ;; [BP + 2] = old B
+    ;; [BP + 3] = return address
+    ;; [BP + 4] = const char * str
+    ;; [BP + 5] = size_t length
+    ;; const char * source = str
+    MOV B, [BP + 4]
+__internal_blocking_write_to_console_loop:
+    PUSH [BP + 5]
+    PUSH B
+    CALL __mar_comport_write
+    CMP A, 0
+    JZ __internal_blocking_write_to_console_flush
+    SUB [BP + 5], A
+    ADD B, A
+    JMP __internal_blocking_write_to_console_loop
+__internal_blocking_write_to_console_flush:
+    CALL __mar_comport_flush
+    CALL __core_sleep
+    ;; if previous flush failed, try again
+    ;; NOTE: this might cause an infinite loop
+    CMP A, 0
+    JZ __internal_blocking_write_to_console_flush
+    ;; if we have written `length` amount of characters we are done
+    CMP [BP + 5], 0
+    JZ __internal_blocking_write_to_console_return
+    JMP __internal_blocking_write_to_console_loop
+__internal_blocking_write_to_console_return:
+    MOV SP, BP
+    POP BP
+    POP B
+    RET 2
+
+;; #[ffi] void prs!(s)
+;; pop a value off the stack and print it as a null terminated string
+;; #[dependency="../c/string.h.mar"] for `size_t __c_strlen(const char * str)`
+;; NOTE: we cannot use `puts` because it will print a '\n' at the end of the string
+prs:
+    ;; preserve A and B
+    PUSH A
+    PUSH B
+    MOV B, [machine_memory]     ; char * loc = machine->memory
+    CALL machine_pop            ; size_t offset = machine_pop()
+    ADD B, A                    ; loc += offset
+    PUSH B
+    CALL __c_strlen             ; size_t length = strlen(loc)
+    PUSH A                      ;
+    PUSH B                      ;
+    ; __internal_blocking_write_to_console(loc, length)
+    CALL __internal_blocking_write_to_console
+    POP B
+    POP A
+    RET

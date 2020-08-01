@@ -102,7 +102,14 @@ type Machine(MACHINE) {
 	}
 
 	fn run(self: &Machine) {
-		while self->ins_ptr != strlen(self->code) {
+		let len = strlen(self->code);
+		let counter = 0;
+		while self->ins_ptr != len {
+			counter = counter + 1;
+			if counter > 65 {
+				counter = 0;
+				//_sleep!();
+			}
 			if self->token == '+' { self.plus() }
 			if self->token == '-' { self.minus() }
 			if self->token == '<' { self.left() }
@@ -120,8 +127,8 @@ type Machine(MACHINE) {
 
 fn main() {
 	let m: Machine = Machine::new(
-		"++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++."
-    );
-    m.run();
-    m.dump();
+		"++."
+	);
+	m.run();
+	m.dump();
 }

@@ -103,6 +103,10 @@ impl AsmProgram {
         }
     }
 
+    pub fn get_externs(&self) -> &Vec<PathBuf> {
+        return &self.externs;
+    }
+
     pub fn assemble(&self, target: &impl Target) -> Result<String, AsmError> {
         // Set up the output code
         let mut result = String::new();

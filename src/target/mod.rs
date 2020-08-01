@@ -8,8 +8,9 @@ pub use mar::MAR;
 pub trait Target {
     fn get_name(&self) -> char;
 
-    fn prelude(&self) -> String;
-    fn postlude(&self) -> String;
+    fn std(&self) -> String;
+    fn core_prelude(&self) -> String;
+    fn core_postlude(&self) -> String;
 
     fn begin_entry_point(&self, var_size: i32, heap_size: i32) -> String;
     fn end_entry_point(&self) -> String;

@@ -17,9 +17,13 @@ impl HirProgram {
         Self(decls, heap_size)
     }
 
-    pub fn get_declarations(&self) -> &[HirDeclaration] {
+    pub fn get_declarations(&self) -> &Vec<HirDeclaration> {
         let Self(decls, _) = self;
         decls
+    }
+
+    pub fn extend_declarations(&mut self, decls: &Vec<HirDeclaration>) {
+        self.0.extend(decls.clone())
     }
 
     pub fn get_heap_size(&self) -> i32 {
@@ -31,6 +35,17 @@ impl HirProgram {
         self.1 = size;
     }
 
+    pub fn use_std(&self) -> bool {
+        for decl in self.get_declarations() {
+            match decl {
+                HirDeclaration::NoStd => return false,
+                HirDeclaration::RequireStd => return true,
+                _ => {}
+            }
+        }
+        false
+    }
+
     pub fn compile(
         &mut self,
         cwd: &PathBuf,
@@ -39,6 +54,7 @@ impl HirProgram {
     ) -> Result<MirProgram, HirError> {
         let mut mir_decls = Vec::new();
         let mut heap_size = self.get_heap_size();
+        let mut std_required = None;
 
         // Iterate over the declarations and retreive the constants
         for decl in self.get_declarations() {
@@ -58,6 +74,16 @@ impl HirProgram {
                 HirDeclaration::Structure(structure) => mir_decls.push(MirDeclaration::Structure(
                     structure.to_mir_struct(&constants, target)?,
                 )),
+                HirDeclaration::RequireStd => if let Some(false) = std_required {
+                    return Err(HirError::ConflictingStdReqs)
+                } else {
+                    std_required = Some(true)
+                },
+                HirDeclaration::NoStd => if let Some(true) = std_required {
+                    return Err(HirError::ConflictingStdReqs)
+                } else {
+                    std_required = Some(false)
+                },
                 HirDeclaration::Assert(constant) => {
                     if constant.to_value(constants, target)? == 0.0 {
                         return Err(HirError::FailedAssertion(constant.clone()))
@@ -142,6 +168,7 @@ impl HirProgram {
 #[derive(Clone, Debug)]
 pub enum HirError {
     ConstantNotDefined(Identifier),
+    ConflictingStdReqs,
     FailedAssertion(HirConstant),
     UserError(String),
 }
@@ -151,6 +178,7 @@ impl Display for HirError {
         match self {
             Self::ConstantNotDefined(name) => write!(f, "constant '{}' is not defined", name),
             Self::UserError(err) => write!(f, "{}", err),
+            Self::ConflictingStdReqs => write!(f, "conflicting 'require_std' and 'no_std' flags present"),
             Self::FailedAssertion(assertion) => write!(f, "failed assertion '{}'", assertion),
         }
     }
@@ -161,6 +189,7 @@ pub enum HirType {
     Pointer(Box<Self>),
     Void,
     Float,
+    Boolean,
     Character,
     Structure(Identifier),
 }
@@ -171,6 +200,7 @@ impl HirType {
             Self::Pointer(inner) => inner.to_mir_type().refer(),
             Self::Void => MirType::void(),
             Self::Float => MirType::float(),
+            Self::Boolean => MirType::boolean(),
             Self::Character => MirType::character(),
             Self::Structure(name) => MirType::structure(name.clone()),
         }
@@ -189,6 +219,8 @@ pub enum HirDeclaration {
     Extern(String),
     Include(String),
     HeapSize(i32),
+    RequireStd,
+    NoStd
 }
 
 #[derive(Clone, Debug)]
@@ -276,6 +308,8 @@ impl HirFunction {
 pub enum HirConstant {
     Float(f64),
     Character(char),
+    True,
+    False,
 
     Add(Box<Self>, Box<Self>),
     Subtract(Box<Self>, Box<Self>),
@@ -301,6 +335,8 @@ pub enum HirConstant {
 impl Display for HirConstant {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         match self {
+            Self::True => write!(f, "true"),
+            Self::False => write!(f, "false"),
             Self::Float(n) => write!(f, "{}", n),
             Self::Character(ch) => write!(f, "'{}'", ch),
             Self::Add(l, r) => write!(f, "{}+{}", l, r),
@@ -329,6 +365,9 @@ impl HirConstant {
         target: &impl Target,
     ) -> Result<f64, HirError> {
         Ok(match self {
+            Self::True => 1.0,
+            Self::False => 0.0,
+            
             Self::Float(n) => *n,
             Self::Character(ch) => *ch as u8 as f64,
 
@@ -573,6 +612,9 @@ pub enum HirExpression {
     Deref(Box<Self>),
 
     Void,
+    True,
+    False,
+    Character(char),
     String(StringLiteral),
     Variable(Identifier),
 
@@ -599,6 +641,9 @@ impl HirExpression {
                 Box::new(l.to_mir_expr(constants, target)?),
                 Box::new(r.to_mir_expr(constants, target)?),
             ),
+
+            Self::True => MirExpression::True,
+            Self::False => MirExpression::False,
 
             Self::Not(expr) => MirExpression::Not(
                 Box::new(expr.to_mir_expr(constants, target)?),
@@ -663,6 +708,7 @@ impl HirExpression {
             }
 
             Self::Void => MirExpression::Void,
+            Self::Character(ch) => MirExpression::Character(*ch),
             Self::String(string) => MirExpression::String(string.clone()),
 
             /// If a variable is actually a constant,

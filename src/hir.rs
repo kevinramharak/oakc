@@ -13,8 +13,10 @@ use core::fmt::{Display, Error, Formatter};
 pub struct HirProgram(Vec<HirDeclaration>, i32);
 
 impl HirProgram {
-    pub fn new(decls: Vec<HirDeclaration>, heap_size: i32) -> Self {
-        Self(decls, heap_size)
+    pub const MINIMUM_MEMORY_SIZE: i32 = 128;
+
+    pub fn new(decls: Vec<HirDeclaration>, memory_size: i32) -> Self {
+        Self(decls, memory_size)
     }
 
     pub fn get_declarations(&self) -> &Vec<HirDeclaration> {
@@ -26,12 +28,12 @@ impl HirProgram {
         self.0.extend(decls.clone())
     }
 
-    pub fn get_heap_size(&self) -> i32 {
-        let Self(_, heap_size) = self;
-        *heap_size
+    pub fn get_memory_size(&self) -> i32 {
+        let Self(_, memory_size) = self;
+        *memory_size
     }
 
-    fn set_heap_size(&mut self, size: i32) {
+    fn set_memory_size(&mut self, size: i32) {
         self.1 = size;
     }
 
@@ -53,7 +55,7 @@ impl HirProgram {
         constants: &mut BTreeMap<String, HirConstant>,
     ) -> Result<MirProgram, HirError> {
         let mut mir_decls = Vec::new();
-        let mut heap_size = self.get_heap_size();
+        let mut memory_size = self.get_memory_size();
         let mut std_required = None;
 
         // Iterate over the declarations and retreive the constants
@@ -74,19 +76,23 @@ impl HirProgram {
                 HirDeclaration::Structure(structure) => mir_decls.push(MirDeclaration::Structure(
                     structure.to_mir_struct(&constants, target)?,
                 )),
-                HirDeclaration::RequireStd => if let Some(false) = std_required {
-                    return Err(HirError::ConflictingStdReqs)
-                } else {
-                    std_required = Some(true)
-                },
-                HirDeclaration::NoStd => if let Some(true) = std_required {
-                    return Err(HirError::ConflictingStdReqs)
-                } else {
-                    std_required = Some(false)
-                },
+                HirDeclaration::RequireStd => {
+                    if let Some(false) = std_required {
+                        return Err(HirError::ConflictingStdReqs);
+                    } else {
+                        std_required = Some(true)
+                    }
+                }
+                HirDeclaration::NoStd => {
+                    if let Some(true) = std_required {
+                        return Err(HirError::ConflictingStdReqs);
+                    } else {
+                        std_required = Some(false)
+                    }
+                }
                 HirDeclaration::Assert(constant) => {
                     if constant.to_value(constants, target)? == 0.0 {
-                        return Err(HirError::FailedAssertion(constant.clone()))
+                        return Err(HirError::FailedAssertion(constant.clone()));
                     }
                 }
                 HirDeclaration::Extern(filename) => {
@@ -154,19 +160,24 @@ impl HirProgram {
                     }
                 }
 
-                HirDeclaration::HeapSize(size) => {
-                    heap_size = *size;
+                HirDeclaration::Memory(size) => {
+                    if *size >= Self::MINIMUM_MEMORY_SIZE {
+                        memory_size = *size;
+                    } else {
+                        return Err(HirError::MemorySizeTooSmall(*size));
+                    }
                 }
                 _ => {}
             }
         }
 
-        Ok(MirProgram::new(mir_decls, heap_size))
+        Ok(MirProgram::new(mir_decls, memory_size))
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum HirError {
+    MemorySizeTooSmall(i32),
     ConstantNotDefined(Identifier),
     ConflictingStdReqs,
     FailedAssertion(HirConstant),
@@ -176,9 +187,17 @@ pub enum HirError {
 impl Display for HirError {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         match self {
+            Self::MemorySizeTooSmall(n) => write!(
+                f,
+                "specified stack + heap memory size '{}' is too small. use '{}' or greater",
+                n,
+                HirProgram::MINIMUM_MEMORY_SIZE
+            ),
             Self::ConstantNotDefined(name) => write!(f, "constant '{}' is not defined", name),
             Self::UserError(err) => write!(f, "{}", err),
-            Self::ConflictingStdReqs => write!(f, "conflicting 'require_std' and 'no_std' flags present"),
+            Self::ConflictingStdReqs => {
+                write!(f, "conflicting 'require_std' and 'no_std' flags present")
+            }
             Self::FailedAssertion(assertion) => write!(f, "failed assertion '{}'", assertion),
         }
     }
@@ -218,9 +237,9 @@ pub enum HirDeclaration {
     Error(String),
     Extern(String),
     Include(String),
-    HeapSize(i32),
+    Memory(i32),
     RequireStd,
-    NoStd
+    NoStd,
 }
 
 #[derive(Clone, Debug)]
@@ -331,7 +350,6 @@ pub enum HirConstant {
     Not(Box<Self>),
 }
 
-
 impl Display for HirConstant {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         match self {
@@ -367,7 +385,7 @@ impl HirConstant {
         Ok(match self {
             Self::True => 1.0,
             Self::False => 0.0,
-            
+
             Self::Float(n) => *n,
             Self::Character(ch) => *ch as u8 as f64,
 
@@ -645,9 +663,7 @@ impl HirExpression {
             Self::True => MirExpression::True,
             Self::False => MirExpression::False,
 
-            Self::Not(expr) => MirExpression::Not(
-                Box::new(expr.to_mir_expr(constants, target)?),
-            ),
+            Self::Not(expr) => MirExpression::Not(Box::new(expr.to_mir_expr(constants, target)?)),
             Self::And(l, r) => MirExpression::And(
                 Box::new(l.to_mir_expr(constants, target)?),
                 Box::new(r.to_mir_expr(constants, target)?),

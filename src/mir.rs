@@ -338,20 +338,20 @@ impl Display for MirType {
 pub struct MirProgram(Vec<MirDeclaration>, i32);
 
 impl MirProgram {
-    pub fn new(decls: Vec<MirDeclaration>, heap_size: i32) -> Self {
-        Self(decls, heap_size)
+    pub fn new(decls: Vec<MirDeclaration>, memory_size: i32) -> Self {
+        Self(decls, memory_size)
     }
 
     pub fn get_declarations(&self) -> Vec<MirDeclaration> {
         (self.0).clone()
     }
 
-    pub fn get_heap_size(&self) -> i32 {
+    pub fn get_memory_size(&self) -> i32 {
         self.1
     }
 
     pub fn assemble(&self) -> Result<AsmProgram, MirError> {
-        let Self(decls, heap_size) = self.clone();
+        let Self(decls, memory_size) = self.clone();
         let mut externs = Vec::new();
         let mut funcs = BTreeMap::new();
         let mut structs = BTreeMap::new();
@@ -382,7 +382,7 @@ impl MirProgram {
             result.extend(decl.assemble(&mut funcs, &mut structs)?);
         }
 
-        Ok(AsmProgram::new(externs, result, heap_size))
+        Ok(AsmProgram::new(externs, result, memory_size))
     }
 }
 
@@ -1090,9 +1090,7 @@ impl MirExpression {
                 expr.type_check(vars, funcs, structs)?;
                 let expr_type = expr.get_type(vars, funcs, structs)?;
                 if expr_type.get_size(structs)? != 1 {
-                    return Err(MirError::NonNumberUnaryOperation(
-                        *expr.clone(),
-                    ));
+                    return Err(MirError::NonNumberUnaryOperation(*expr.clone()));
                 }
             }
 
@@ -1253,13 +1251,12 @@ impl MirExpression {
             Self::False => vec![AsmStatement::Expression(vec![AsmExpression::Float(0.0)])],
 
             // Invert the boolean value of an expression
-            Self::Not(expr) => {
-                MirStatement::IfElse(
-                    *expr.clone(),
-                    vec![MirStatement::Expression(MirExpression::Float(0.0))],
-                    vec![MirStatement::Expression(MirExpression::Float(1.0))],
-                ).assemble(vars, funcs, structs)?
-            }
+            Self::Not(expr) => MirStatement::IfElse(
+                *expr.clone(),
+                vec![MirStatement::Expression(MirExpression::Float(0.0))],
+                vec![MirStatement::Expression(MirExpression::Float(1.0))],
+            )
+            .assemble(vars, funcs, structs)?,
 
             /// And two boolean values
             /// And is essentially boolean multiplication,
@@ -1269,8 +1266,9 @@ impl MirExpression {
                 MirExpression::Multiply(l.clone(), r.clone()),
                 vec![MirStatement::Expression(MirExpression::Float(1.0))],
                 vec![MirStatement::Expression(MirExpression::Float(0.0))],
-            ).assemble(vars, funcs, structs)?,
-            
+            )
+            .assemble(vars, funcs, structs)?,
+
             /// Or two boolean values
             /// Or is essentially boolean addition,
             /// so add these two values and use it
@@ -1279,8 +1277,8 @@ impl MirExpression {
                 MirExpression::Add(l.clone(), r.clone()),
                 vec![MirStatement::Expression(MirExpression::Float(1.0))],
                 vec![MirStatement::Expression(MirExpression::Float(0.0))],
-            ).assemble(vars, funcs, structs)?,
-
+            )
+            .assemble(vars, funcs, structs)?,
 
             /// Are two numbers equal?
             /// I know this expression doesn't type check,
@@ -1289,8 +1287,9 @@ impl MirExpression {
                 MirExpression::Subtract(l.clone(), r.clone()),
                 vec![MirStatement::Expression(MirExpression::Float(0.0))],
                 vec![MirStatement::Expression(MirExpression::Float(1.0))],
-            ).assemble(vars, funcs, structs)?,
-            
+            )
+            .assemble(vars, funcs, structs)?,
+
             /// Are two numbers not equal?
             /// I know this expression doesn't type check,
             /// but it is correctly implemented.
@@ -1298,7 +1297,8 @@ impl MirExpression {
                 MirExpression::Subtract(l.clone(), r.clone()),
                 vec![MirStatement::Expression(MirExpression::Float(1.0))],
                 vec![MirStatement::Expression(MirExpression::Float(0.0))],
-            ).assemble(vars, funcs, structs)?,
+            )
+            .assemble(vars, funcs, structs)?,
 
             /// A typecast is only a way to explicitly validate
             /// some kinds of typechecks. The typecast expression
@@ -1450,9 +1450,7 @@ impl MirExpression {
             Self::Call(func_name, args) => {
                 let mut result = Vec::new();
                 // Push arguments onto the stack in reverse order
-                let mut args = args.clone();
-                args.reverse();
-                for arg in args {
+                for arg in args.iter().rev() {
                     result.extend(arg.assemble(vars, funcs, structs)?);
                 }
                 // Call the function
@@ -1465,9 +1463,7 @@ impl MirExpression {
             /// Call a foreign function
             Self::ForeignCall(func_name, args) => {
                 let mut result = Vec::new();
-                let mut args = args.clone();
-                args.reverse();
-                for arg in args {
+                for arg in args.iter().rev() {
                     result.extend(arg.assemble(vars, funcs, structs)?);
                 }
                 result.push(AsmStatement::Expression(vec![AsmExpression::ForeignCall(
@@ -1682,7 +1678,7 @@ impl Display for MirExpression {
             Self::Alloc(size) => write!(f, "alloc({})", size),
 
             Self::Void => write!(f, "@"),
-            Self::Character(ch) => write!(f, "{}", ch),
+            Self::Character(ch) => write!(f, "'{}'", ch),
             Self::Float(n) => write!(f, "{}", n),
             Self::String(s) => write!(f, "{:?}", s),
 

@@ -2,3 +2,20 @@
 ;; big one, stdout should be easy (assuming its the console)
 ;; so should stdin be (assuming its the keyboard)
 ;; fun starts once we implement a file system on the floppy
+
+__C_BUFSIZ equ 0 ;; ?
+__C_EOF equ -1
+__C_FILENAME_MAX equ 0 ;; ?
+__C_L_tmpnam equ 0 ;; ?
+__C_NULL equ 0
+__C_TMP_MAX equ 0 ;; ?
+
+;; fseek constants?
+
+;; setvbuf constants?
+
+
+; Types
+; FILE - Object containing information to control a stream (type )
+; fpos_t - Object containing information to specify a position within a file (type )
+; for fgetpos and fsetpos?

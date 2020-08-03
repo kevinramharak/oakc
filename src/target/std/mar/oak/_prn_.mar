@@ -1,0 +1,46 @@
+;;/
+;; This is a foreign function file used by 'std.ok`.
+;; NOTE: any #[ffi] function defintions are expected to work with the virtual machine instead of normal MAR calling conventions
+;;/
+
+;; #[ffi] void prn!(n)
+;; pop a value off the stack convert it from a number to a string and print it as a null terminated string
+;; implementation from: https://stackoverflow.com/a/3982700
+;; #[dependency="../c/string.h"]
+;; what it should do:
+;;  - use stdlib::
+prn:
+__oak_prn:
+    push B
+    push Y
+    push BP
+    mov BP, SP
+    call __core_machine_pop  ; pop value into
+    mov B, __oak_prn_buffer ; char * loc = &__oak_prn_buffer
+    add B, 4          ; loc += 4 // move to the end of the buffer, but before the null terminator
+__oak_prn_loop:
+    cmp A, 10         ; while (value >= 10)
+    jl __oak_prn_break
+    mov Y, 0         ; zero out Y for the DIV op
+    div 10           ; divide by 10, result in A, remainder in Y
+    add Y, 0x30      ; convert remainder to ascii character
+    mov [B], Y       ;
+    dec B
+    jmp __oak_prn_loop
+__oak_prn_break:
+    add A, 0x30
+    mov [B], A
+__oak_prn_loop_prc:
+    push B
+    call __c_strlen   ; size_t length = __c_strlen(__oak_prn_buffer)
+    push A
+    push B
+    ; __mar_comport_write_blocking(loc, length)
+    call __mar_comport_write_blocking
+__oak_prn_return:
+    mov SP, BP
+    pop BP
+    pop Y
+    pop B
+    ret
+__oak_prn_buffer: dw 6 dup(0x00) ; space for 5 character + '\0'

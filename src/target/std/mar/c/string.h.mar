@@ -6,7 +6,7 @@
 ;;         http://www.cplusplus.com/reference/cstring/
 ;;/
 
-__C_NULL EQU 0x0000
+__C_NULL equ 0x0000
 
 ;; TODO: implement the ones needed
 
@@ -38,7 +38,24 @@ __C_NULL EQU 0x0000
 
 ;; char * strerror(int);
 
-;; size_t strlen(const char *);
+;; size_t __c_strlen(const char * str);
+__c_strlen:
+    push BP
+    mov BP, SP
+    ;; [BP + 0] = old BP
+    ;; [BP + 1] = return address
+    ;; [BP + 2] = const char * str
+    mov A, [BP + 2]
+__c_strlen_loop:
+    cmp [A], 0
+    jz __c_strlen_return
+    inc A
+    jmp __c_strlen_loop
+__c_strlen_return:
+    sub A, [BP + 2]
+    mov SP, BP
+    pop BP
+    ret 1
 
 ;; char * strncat(char *, const char *, size_t);
 

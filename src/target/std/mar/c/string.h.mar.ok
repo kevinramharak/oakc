@@ -1,0 +1,9 @@
+
+#[if(!isdef("C_STRING")) {
+    // include guard
+    const C_STRING = 1;
+    // include dependencies
+
+    // include asm implementation
+    #[extern("string.h.mar")]
+}]

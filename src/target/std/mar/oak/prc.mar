@@ -1,0 +1,22 @@
+;;/
+;; This is a foreign function file used by 'std.ok`.
+;; NOTE: any #[ffi] function defintions are expected to work with the virtual machine instead of normal MAR calling conventions
+;;/
+
+;; #[ffi] void prc!(ch)
+;; pop a value off the stack and print it as character
+;; #[dependency="../mar/comport.mar"] for `void __mar_blocking_write_to_console(const char * str, size_t length)``
+prc:
+__oak_prc:
+    push BP
+    mov BP, SP
+    call __core_machine_pop
+    mov [__oak_prc_buffer], A
+    push 1
+    push __oak_prc_buffer
+    ; __mar_comport_write_blocking(loc, length)
+    call __mar_comport_write_blocking
+    mov SP, BP
+    pop BP
+    ret
+__oak_prc_buffer: dw 0x0000

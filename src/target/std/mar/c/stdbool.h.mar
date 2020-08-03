@@ -5,5 +5,5 @@
 ;; Source: http://www.cplusplus.com/reference/cstdbool/
 ;;/
 
-__C_true EQU 1
-__C_false EQU 0
+__C_true equ 1
+__C_false equ 0

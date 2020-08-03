@@ -1,10 +1,9 @@
 
-#[if(!isdef("OAK_PRS")) {
+#[if(!isdef("OAK_PREND")) {
     // include guard
-    const OAK_PRS = 1;
+    const OAK_PREND = 1;
     // include dependencies
-    #[include("../c/string.h.mar.ok")]
     #[include("../mar/comport.mar.ok")]
     // include asm implementation
-    #[extern("prs.mar")]
+    #[extern("prend.mar")]
 }]

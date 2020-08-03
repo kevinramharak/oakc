@@ -1,0 +1,80 @@
+;;/
+;; This is a foreign function file used by 'std.ok`.
+;; NOTE: any #[ffi] function defintions are expected to work with the virtual machine instead of normal MAR calling conventions
+;;/
+
+HWID_KEYBOARD equ 0x4
+;*************************** Keyboard actions IDs
+KEYBOARD_CLEAR     equ 0
+KEYBOARD_FETCH_KEY equ 1
+;*************************** Keys IDs
+KEY_ESC   equ 0x1b
+KEY_SPACE equ 0x20
+KEY_ENTER equ 0xd
+KEY_NEWLINE equ 0xa
+KEY_0     equ 0x30
+KEY_1     equ 0x31
+KEY_2     equ 0x32
+KEY_3     equ 0x33
+KEY_4     equ 0x34
+KEY_5     equ 0x35
+KEY_6     equ 0x36
+KEY_7     equ 0x37
+KEY_8     equ 0x38
+KEY_9     equ 0x39
+KEY_A     equ 0x41
+KEY_B     equ 0x42
+KEY_C     equ 0x43
+KEY_D     equ 0x44
+KEY_E     equ 0x45
+KEY_F     equ 0x46
+KEY_G     equ 0x47
+KEY_H     equ 0x48
+KEY_I     equ 0x49
+KEY_J     equ 0x4a
+KEY_K     equ 0x4b
+KEY_L     equ 0x4c
+KEY_M     equ 0x4d
+KEY_N     equ 0x4e
+KEY_O     equ 0x4f
+KEY_P     equ 0x50
+KEY_Q     equ 0x51
+KEY_R     equ 0x52
+KEY_S     equ 0x53
+KEY_T     equ 0x54
+KEY_U     equ 0x55
+KEY_V     equ 0x56
+KEY_W     equ 0x57
+KEY_X     equ 0x58
+KEY_Y     equ 0x59
+KEY_Z     equ 0x5a
+
+;; void getch!()
+;; TODO: should use '../mar/keyboard'
+;; retrieve a character from stdin and push it on the stack
+;; NOTE: seems like getch is expected to block so we emulate that behaviour
+;; https://github.com/simon987/Much-Assembly-Required/wiki/(Hardware)-Keyboard
+getch:
+__oak_getch:
+    push B
+    push BP
+    mov BP, SP
+__oak_getch_fetch:
+    mov A, KEYBOARD_FETCH_KEY
+    hwi HWID_KEYBOARD
+    cmp B, 0   ; if the result is zero there was no character in the keyboard buffer
+    jnz __oak_getch_newline_check
+    call __core_sleep ; to prevent spinning and draining the server / have the server terminate our execution we use sleep
+    jmp __oak_getch_fetch
+__oak_getch_newline_check:
+    ;; NOTE: oakc examples ignore '\r' and work with '\n' characters, so we do a switcheroo
+    cmp B, KEY_ENTER ;; if key is a '\r' character, replace it with a '\n' character
+    jnz __oak_getch_return
+    mov B, KEY_NEWLINE
+__oak_getch_return:
+    push B
+    call __core_machine_push
+    mov SP, BP
+    pop BP
+    pop B
+    ret

@@ -22,13 +22,14 @@ fn get_char() -> char { return getch!() as char; }
 #[include("oak/prs.mar.ok")]
 
 // print line ending
-// #[include("oak/prend.mar.ok")]
+#[include("oak/prend.mar.ok")]
 
 // print number
-// #[include("oak/prn.mar.ok")]
+// NOTE: windows gets confused by the 'prn' in the name and tries to use it like a printer
+#[include("oak/_prn_.mar.ok")]
 
 // print character
-// #[include("oak/prc.mar.ok")]
+#[include("oak/prc.mar.ok")]
 
 // get a character from stdin (assume blocking execution until we have one)
-// #[include("oak/getch.mar.ok")]
+#[include("oak/getch.mar.ok")]

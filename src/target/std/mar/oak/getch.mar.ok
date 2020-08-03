@@ -1,0 +1,9 @@
+
+#[if(!isdef("OAK_GETCH")) {
+    // include guard
+    const OAK_GETCH = 1;
+    // include dependencies
+    //#[include("../mar/keyboard.mar.ok")]
+    // include asm implementation
+    #[extern("getch.mar")]
+}]

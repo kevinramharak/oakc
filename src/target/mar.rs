@@ -78,20 +78,21 @@ impl Target for MAR {
     }
 
     fn core_postlude(&self) -> String {
-        String::from("__CORE_INIT_HEAP_START:")
+        String::from("__core_heap_start:")
     }
 
-    fn begin_entry_point(&self, var_size: i32, heap_size: i32) -> String {
-        // TODO: constrain sizes and/or error
+    fn begin_entry_point(&self, global_scope_size: i32, memory_size: i32) -> String {
         // TODO: these should be constants, but because they are after core_prelude they cant be
         String::from(format!(r##"
-__CORE_INIT_VM_VARS: DW {}
-__CORE_INIT_VM_CAPACITY: DW {}
+__core_global_scope_size: DW {}
+__core_vm_capacity: DW {}
 __core_main:
-"##, var_size as i16, (heap_size + var_size) as i16))
+"##, global_scope_size as i16, (global_scope_size + memory_size) as i16))
     }
 
     fn end_entry_point(&self) -> String {
+        // technically we want to get the return value from main and return it to the hosting environment
+        // but since we are the host running only the oak program we can ignore it for now
         String::from("    RET\n")
     }
 

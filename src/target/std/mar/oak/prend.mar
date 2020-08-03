@@ -1,0 +1,16 @@
+;;/
+;; This is a foreign function file used by 'std.ok`.
+;; NOTE: any #[ffi] function defintions are expected to work with the virtual machine instead of normal MAR calling conventions
+;;/
+
+;; #[ffi] void prend!()
+;; print a newline character
+;; #[dependency="../mar/comport.mar"] for `void __mar_blocking_write_to_console(const char * str, size_t length)``
+prend:
+__oak_prend:
+    push 1
+    push __oak_prend_buffer
+    ; __mar_comport_write_blocking(loc, length)
+    call __mar_comport_write_blocking
+    ret
+__oak_prend_buffer: dw 0x000A

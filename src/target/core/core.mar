@@ -1,287 +1,366 @@
 ;; TODO: being forced to generate this in a fixed order is annoying and removes modularity. Keep in check with any multi file features for MAR
-;; TODO: decide if sleep functionality should be part of the runtime or not
 
 ;; we want the runtime to be be able to host 'itself' by not depending on any dependencies
 ;; other than that it should only implement the virtual machine and any required initialization code
 
-;; Setting the binary offset to 0 makes sure our .data section starts at address 0x0000, default would be 0x0200
-;; TODO: we only need the ORG directive to be able to circumvent hardcoded adresse, those will probably be configurable in the future
-ORG 0
+;; Setting the binary offset to 0 makes sure our .data section starts at address 0x0000
+org 0
 
 ;; data segment - for now assumed that .data starts at adress 0x00
 ;; NOTE: the _0x00xx labels are just to help visualize the offsets
 ;; TODO: do not leak these labels
 ;; NOTE: there are some static variables scattered trough the source, decide on what stays static inline and what can move to the data section
-_0x0000:
 .data
-    ;; _sleep variables
-    __core_should_wake:  DW 0x0000
-    __core_BP_cache: DW 0x0000
-    __core_SP_cache: DW 0x0000
+_0x0000:
+    __core_interrupt_vector_table:
+    ;; division by zero causes an interrupt
+    __core_interrupt_divide_by_zero: dw 0x0153
+_0x0001:
+    ;; not implemented server side
+    __core_interrupt_trap: dw 0x0153
+_0x0002:
+    ;; not implemented server side
+    __core_interrupt_nmi: dw 0x0153
 _0x0003:
-    ;; padding to be able to adress the following 3 labels
-    DW 77 DUP(0x1234)
-
+    ;; not implemented server side
+    __core_interrupt_break_point: dw 0x0153
+_0x0004:
+    ;; this interrupt requires a INTO instruction and the overflow flag to be set
+    __core_interrupt_integer_overflow: dw 0x0153
+_0x0005:
+    ;; keep 0x05 - 0x1F reserved for future interrupt handlers
+    dw 0x1B dup(0x0153)
+_0x0020:
+    ;; MAR server causes this interrupt when the cpu is not allowed to execute any more instructions
+    ;; gives 10_0000 instructions to save state and brk.
+    ;; If execution is forcibly stopped the behaviour of the runtime is undefined
+    __core_interrupt_execution_limit_reached: dw 0x0153
+_0x0021:
+    ;; keep 0x20 - 0x3f reserverd for future (hardware) interrupt handlers
+    __core_interrupt_vector_table_hardware: dw 0x001F dup(0x0153)
+_0x0040:
+    ;; keep 0x40 - 0x40 reserved for core interrupt handlers
+    __core_interrupt_vector_table_core:
+    ;; software interrupt for a panic of unkown reason
+    __core_interrupt_panic_unkown: dw 0x0000
+    ;; software interrupt for a panic caused by a stack and heap collision
+    __core_interrupt_panic_stack_heap_collision: dw 0x0000
+    ;; software interrupt for a panic caused by having no more free memory
+    __core_interrupt_panic_no_free_memory: dw 0x0000
+    ;; software interrupt for a panic caused by a stack underflow
+    __core_interrupt_panic_stack_underflow: dw 0x0000
+    ;; 0x41 - 0x7f is open for software interrupts
+    __core_interrupt_vector_table_software:
+    dw 0x3E dup(0x0153)
+    ;; TODO: figure out how the stdlib is going to reserve interrupts
+    ;; probably by owning the software interrupt table and providing an interface to interact with it
+_0x0080:
+    ;; padding
+    dw 0xCE dup(0xdead) ;; this padding can be used for core static variables / data
+    ;; padding
+_0x014D:
+    ;; static variables used by __core_* functions
+    ;; static const char * __core_panic_unkown_message
+    __core_panic_unkown_message: dw "\nERR_UNKNOWN", 0 ;; 13 length
+    ;; static const char * __core_panic_stack_heap_collision
+    __core_panic_stack_heap_collision: dw "\nERR_STACK_HEAP_COLLISION", 0 ;; 26 length
+    ;; static const char * __core_panic_no_free_memory
+    __core_panic_no_free_memory: dw "\nERR_NO_FREE_MEMORY", 0 ;; 22 length
+    ;; static const char * __core_panic_stack_underflow
+    __core_panic_stack_underflow: dw "\nERR_STACK_UNDERFLOW", 0 ;; 21 length
+    ;; static bool __core_sleep_wake_flag
+    __core_sleep_wake_flag: dw 0x0000
+    ;; static size_t __core_BP_cache
+    __core_sleep_BP_cache: dw 0x0000
+    ;; static size_t __core_SP_cache
+    __core_sleep_SP_cache: dw 0x0000
+_0x0150:
     ;; 3 words reserved for execution cost variables. These are set by the server executing the code
     ;; see https://github.com/simon987/Much-Assembly-Required/blob/master/Server/src/main/java/net/simon987/server/assembly/CPU.java#L194
-_0x0050:
-    __core_EXECUTION_COST_ADDR: DW 0x0000
+    __core_execution_cost_addr: dw 0x0000
     ;; 32 bit signed integer
-    __core_EXECUTED_INSTRUCTION_COUNT_HIGHER: DW 0x0000
-    __core_EXECUTED_INSTRUCTION_COUNT_LOWER: DW 0x0000
+    __core_executed_instruction_count: dw 0x0000, 0x0000
 
-;; execution on a server tick always starts at .text, on a server reset memory will be cleared
-_0x0053:
-.text
-    ;; if flag is set restore from previous sleep call
-    CMP [__core_should_wake], 1
-    JZ __core_wake
+;; NOTE: at the moment we have to compute some of these interrupt addresses because the assembly cant use labels as a DW argument
+;; putting it right here after static data makes it easy to calculate the address
+_0x0153:
+;; #[interrupt_handler] #[no_return] void __core_interrupt_handler_default()
+;; this handler can be used as the default address for interrupt handlers
+;; this prevents unhandled interrupts from jumping to random locations
+__core_interrupt_handler_default:
+    ;; either interrupt to panic_unknown or to panic_unhandled_interrupt?
+    jmp __core_interrupt_panic_unkown
 
-    ;; else intialize the vm
-    CALL __core_machine_new
+;; #[interrupt_handler] void __core_interrupt_handler_panic_unkown()
+__core_interrupt_handler_panic_unkown:
+    push 0
+    call __core_panic
 
-    ;; call main
-    CALL __core_main
-    ;; if returning from main spin with a sleep call
-__core_spin:
-    CALL __core_sleep
-    JMP __core_spin
-
-;; sleep and wake implementation
-;; allows to control execution start each server tick
-;; if sleep isnt used, execution will always start at .text
-__core_sleep:
-    ;; not sure if registers are preserved between each game tick, so sleep will preserve all state
-    PUSHF                   ;; store flags
-    PUSH A                  ;; store registers
-    PUSH B
-    PUSH C
-    PUSH D
-    PUSH X
-    PUSH Y
-    MOV [__core_BP_cache], BP      ;; store stack base pointer and stack pointer
-    MOV [__core_SP_cache], SP
-    MOV [__core_should_wake], 1    ;; set the flag
-    BRK                     ;; wait till until next tick
-__core_wake:                      ;; execution will resume here
-    MOV [__core_should_wake], 0    ;; clear the flag
-    MOV SP, [__core_SP_cache]      ;; restore stack base pointer and stack pointer
-    MOV BP, [__core_BP_cache]
-    POP Y                   ;; restore registers
-    POP X
-    POP D
-    POP C
-    POP B
-    POP A
-    POPF                    ;; restore flags
-    ;; since `CALL sleep` never executed a RET instruction this will restore execution after the most recent executed `CALL sleep` instruction
-    RET
-
-;; void panic(int code); // fatal error handler, always exists program
-;; TODO: the strings can probably be allocated in the .data section
 __CORE_STACK_HEAP_COLLISION EQU 1
 __CORE_NO_FREE_MEMORY EQU 2
 __CORE_STACK_UNDERFLOW EQU 3
-__core_panic_default_message: DW "\nERR_UNKNOWN", 0 ;; 13 length
-__core_panic_stack_heap_collision: DW "\nERR_STACK_HEAP_COLLISION", 0 ;; 26 length
-__core_panic_no_free_memory: DW "\nERR_NO_FREE_MEMORY", 0 ;; 22 length
-__core_panic_stack_underflow: DW "\nERR_STACK_UNDERFLOW", 0 ;; 21 length
+;; #[interrupt_handler] #[no_return] void __core_interrupt_handler_panic_stack_heap_collision()
+__core_interrupt_handler_panic_stack_heap_collision:
+    push __CORE_STACK_HEAP_COLLISION
+    call __core_panic
+;; #[interrupt_handler] #[no_return] void __core_interrupt_handler_panic_no_free_memory()
+__core_interrupt_handler_panic_no_free_memory:
+    push __CORE_STACK_HEAP_COLLISION
+    call __core_panic
+;; #[interrupt_handler] #[no_return] void __core_interrupt_handler_panic_stack_underflowy()
+__core_interrupt_handler_panic_stack_underflow:
+    push __CORE_STACK_UNDERFLOW
+    call __core_panic
+
+;; #[no_return] void __core_panic(int error_code)
+;; prints a user friendly error message and then exits the program
+;; in our case this means spinning forever
 __core_panic:
-    PUSH BP
-    MOV BP, SP
-    MOV A, [BP + 2]
-    MOV C, __core_panic_default_message
-    ;; stack and heap collision
+    push BP
+    mov BP, SP
+    mov A, [BP + 2]
+    mov X, __core_panic_unkown_message
 __core_panic_case_1:
-    CMP A, 1
-    JNZ __core_panic_case_2
-    MOV C, __core_panic_stack_heap_collision
-    JMP __core_panic_end
+    cmp A, 1
+    jnz __core_panic_case_2
+    mov X, __core_panic_stack_heap_collision
+    jmp __core_panic_end
 __core_panic_case_2:
-    CMP A, 2
-    JNZ __core_panic_case_3
-    MOV C, __core_panic_no_free_memory
-    JMP __core_panic_end
+    cmp A, 2
+    jnz __core_panic_case_3
+    mov X, __core_panic_no_free_memory
+    jmp __core_panic_end
 __core_panic_case_3:
-    CMP A, 3
-    JNZ __core_panic_end
-    MOV C, __core_panic_stack_underflow
+    cmp A, 3 
+    jnz __core_panic_end
+    mov X, __core_panic_stack_underflow
 __core_panic_end:
-    ;; TODO: print out without using stdlib
-__core_panic_spin:
-    CALL __core_sleep
-    JMP __core_panic_spin
+    mov A, 3 ;; COMPORT_SELF_OUT
+__core_panic_write:
+    mov B, 0
+    hwi 0x0D ;; HWID_COMPORT
+__core_panic_scan:
+    inc X
+    inc B
+    cmp [X], 0
+    jz __core_spin
+    cmp B, 8
+    jz __core_panic_write
+    jmp __core_panic_scan
+
+;; #[no_return] void __core_spin()
+;; never returns execution to the caller
+__core_spin:
+    call __core_sleep
+    jmp __core_spin
+
+;; void __core_sleep()
+;; saves the registers and status flags before and set a flag before ending the current tick with `BRK`
+;; on a new tick excution will start at .text.
+;; if the flag is set it will restore the saved state before returning execution to the original caller
+__core_sleep:
+    ;; save status and register state
+    push A
+    push B
+    push C
+    push D
+    push X
+    push Y
+    pushf
+    ;; store stack base pointer and stack pointer
+    mov [__core_sleep_BP_cache], BP
+    mov [__core_sleep_SP_cache], SP
+    ;; set the flag
+    mov [__core_sleep_wake_flag], 1
+    ;; wait till until next tick
+    brk
+    ;; execution will resume here
+__core_wake:
+    ;; clear the flag
+    mov [__core_sleep_wake_flag], 0
+    ;; restore stack base pointer and stack pointer
+    mov SP, [__core_sleep_SP_cache]
+    mov BP, [__core_sleep_BP_cache]
+    ;; restore register state
+    popf
+    pop Y
+    pop X
+    pop D
+    pop C
+    pop B
+    pop A
+    ;; since `call sleep` never executed a ret instruction this will restore execution after the most recent executed `call sleep` instruction
+    ret
 
 ;; virtual machine implementation
 ;; based on the vm implementation in 'std.c'
 
 ;; stack pointer starts at mem[65535] goes towards mem[0]
 __CORE_STACK_START equ 0xffff
-;; we expected a label to be at the end of all code named `__CORE_INIT_HEAP_START`
+;; we expected a label to be at the end of all code named `__core_heap_start`
 
 ;; static struct machine * vm
-__core_vm_memory: DW 0x0000 ; int * memory
-__core_vm_allocated: DW 0x0000 ; bool * allocated
-__core_vm_capacity: DW 0x0000 ; int capacity
-__core_vm_stack_ptr: DW 0x0000 ; int stack_ptr
+__core_vm_memory: dw 0x0000 ; int * memory
+__core_vm_allocated: dw 0x0000 ; bool * allocated
+__core_vm_capacity: dw 0x0000 ; int capacity
+__core_vm_stack_ptr: dw 0x0000 ; int stack_ptr
 
 ;; initialize virtual machine struct
 __core_machine_new:
     ;; TODO: write an heap implementation that doesnt have a 100% memory overhead
-    ;; compiler figures out how big the tape must be and defines it as `__CORE_INIT_VM_CAPACITY: DW value`
-    ;; NOTE: probably does not support recursion
-    MOV [__core_vm_capacity], [__CORE_INIT_VM_CAPACITY]
-    ;; vm->memory is a pointer to the __CORE_INIT_HEAP_START address
-    MOV [__core_vm_memory], __CORE_INIT_HEAP_START
+    ;; compiler figures out how big the tape must be and defines it as `__core_vm_capacity: dw value`
+    mov [__core_vm_capacity], [__core_vm_capacity]
+    ;; vm->memory is a pointer to the __core_heap_start address
+    mov [__core_vm_memory], __core_heap_start
 
-    ;; vm->allocated  is a pointer to the __CORE_INIT_HEAP_START address with an offset of vm->capacity
-    MOV [__core_vm_allocated], __CORE_INIT_HEAP_START
-    ADD [__core_vm_allocated], [__core_vm_capacity]
-    ;; compiler figures out how big the stack can be and defines it as `__CORE_INIT_VM_VARS: DW value`
+    ;; vm->allocated  is a pointer to the __core_heap_start address with an offset of vm->capacity
+    mov [__core_vm_allocated], __core_heap_start
+    add [__core_vm_allocated], [__core_vm_capacity]
+    ;; compiler figures out how big the stack can be and defines it as `__core_global_scope_size: dw value`
     ;; the c impl does a for loop with push(0) for this size, but the end result is the same as setting the stack ptr to this size
-    MOV [__core_vm_stack_ptr], [__CORE_INIT_VM_VARS]
-    RET
+    mov [__core_vm_stack_ptr], [__core_global_scope_size]
+    ret
 
 ;; void __core_machine_allocate()
 ;; pop size of the stack
 __core_machine_allocate:
-    PUSH A
-    PUSH B
-    PUSH C
-    PUSH D
-    PUSH X
-    PUSH Y
-    PUSH BP
-    MOV BP, SP
-    CALL __core_machine_pop           ; int size = __core_machine_pop()
-    MOV B, [__core_vm_capacity]  ; int i = vm->capacity
-    DEC B                      ; i -= 1
-    MOV C, [__core_vm_allocated] ; int * loc_allocated = vm->allocated
-    MOV X, 0                   ; int consecutive_free_cells = 0
+    push A
+    push B
+    push C
+    push D
+    push X
+    push Y
+    push BP
+    mov BP, SP
+    call __core_machine_pop           ; int size = __core_machine_pop()
+    mov B, [__core_vm_capacity]  ; int i = vm->capacity
+    dec B                      ; i -= 1
+    mov C, [__core_vm_allocated] ; int * loc_allocated = vm->allocated
+    mov X, 0                   ; int consecutive_free_cells = 0
 __core_machine_allocate_loop_find:
-    CMP B, [__core_vm_stack_ptr] ; while (i > vm->stack_ptr)
-    JLE __core_machine_allocate_loop_break
-    MOV D, C                   ; 
-    ADD D, B                   ; int is_allocated = vm->allocated[i]
-    CMP [D], 0                 ; if !is_allocated
-    JNZ __core_machine_allocate_loop_find_false
-    INC X
-    JMP __core_machine_allocate_loop_find_true
+    cmp B, [__core_vm_stack_ptr] ; while (i > vm->stack_ptr)
+    jle __core_machine_allocate_loop_break
+    mov D, C                   ; 
+    add D, B                   ; int is_allocated = vm->allocated[i]
+    cmp [D], 0                 ; if !is_allocated
+    jnz __core_machine_allocate_loop_find_false
+    inc X
+    jmp __core_machine_allocate_loop_find_true
 __core_machine_allocate_loop_find_false:
-    MOV X, 0
+    mov X, 0
 __core_machine_allocate_loop_find_true:
-    CMP X, A                   ; if consecutive_free_cells == size
-    JZ __core_machine_allocate_loop_break
-    DEC B
-    JNZ __core_machine_allocate_loop_find
+    cmp X, A                   ; if consecutive_free_cells == size
+    jz __core_machine_allocate_loop_break
+    dec B
+    jnz __core_machine_allocate_loop_find
 __core_machine_allocate_loop_break:
-    MOV Y, B                   ; int addr = i
-    CMP Y, [__core_vm_stack_ptr] ; if addr <= vm->stack_ptr then panic
-    JLE __core_machine_allocate_loop_panic
-    MOV B, 0                   ; i = 0
+    mov Y, B                   ; int addr = i
+    cmp Y, [__core_vm_stack_ptr] ; if addr <= vm->stack_ptr then panic
+    jle __core_machine_allocate_loop_panic
+    mov B, 0                   ; i = 0
 __core_machine_allocate_loop_mark:
-    CMP B, A                   ; while (i < size)
-    JGE __core_machine_allocate_return
-    MOV D, C                   ; int * loc = vm->allocated
-    ADD D, B                   ; loc += i
-    MOV [D], 1                 ; *loc = 1
-    INC B
-    JMP __core_machine_allocate_loop_mark
+    cmp B, A                   ; while (i < size)
+    jge __core_machine_allocate_return
+    mov D, C                   ; int * loc = vm->allocated
+    add D, B                   ; loc += i
+    mov [D], 1                 ; *loc = 1
+    inc B
+    jmp __core_machine_allocate_loop_mark
 __core_machine_allocate_return:
-    PUSH Y
-    CALL __core_machine_push
-    MOV SP, BP
-    POP BP
-    POP Y
-    POP X
-    POP D
-    POP C
-    POP B
-    POP A
-    RET
+    push Y
+    call __core_machine_push
+    mov SP, BP
+    pop BP
+    pop Y
+    pop X
+    pop D
+    pop C
+    pop B
+    pop A
+    ret
 __core_machine_allocate_loop_panic:
-    PUSH __CORE_NO_FREE_MEMORY
-    CALL __core_panic
+    push __CORE_NO_FREE_MEMORY
+    call __core_panic
 
 ;; double __core_machine_free()
 __core_machine_free:
-    PUSH B
-    PUSH C
-    PUSH D
-    PUSH X
-    PUSH BP
-    MOV BP, SP
-    CALL __core_machine_pop         ; int addr = __core_machine_pop() // C
-    MOV C, A
-    CALL __core_machine_pop         ; int size = __core_machine_pop() // A
-    MOV B, 0                 ; int i = 0                // B
+    push B
+    push C
+    push D
+    push X
+    push BP
+    mov BP, SP
+    call __core_machine_pop         ; int addr = __core_machine_pop() // C
+    mov C, A
+    call __core_machine_pop         ; int size = __core_machine_pop() // A
+    mov B, 0                 ; int i = 0                // B
 __core_machine_free_loop:
-    CMP B, A
-    JL __core_machine_free_return
-    MOV D,   C                 ; int d = addr + i
-    ADD D, B
-    MOV X, [__core_vm_allocated]
-    ADD X, D
-    MOV [X], 0                 ; vm->allocated[addr + i] = false
-    MOV X, [__core_vm_memory]
-    ADD X, D
-    MOV [X], 0                 ; vm->memory[addr + i] = 0
-    INC B
-    JMP __core_machine_free_loop
+    cmp B, A
+    jl __core_machine_free_return
+    mov D,   C                 ; int d = addr + i
+    add D, B
+    mov X, [__core_vm_allocated]
+    add X, D
+    mov [X], 0                 ; vm->allocated[addr + i] = false
+    mov X, [__core_vm_memory]
+    add X, D
+    mov [X], 0                 ; vm->memory[addr + i] = 0
+    inc B
+    jmp __core_machine_free_loop
 __core_machine_free_return:
-    MOV SP, BP
-    POP BP
-    POP X
-    POP D
-    POP C
-    POP B
-    RET
+    mov SP, BP
+    pop BP
+    pop X
+    pop D
+    pop C
+    pop B
+    ret
 
 ;; void __core_machine_push(int n)
 ;; push n to the stack
 __core_machine_push:
-    PUSH A
-    PUSH BP
-    MOV BP, SP
+    push A
+    push BP
+    mov BP, SP
     ;; if vm->allocated[vm->stack_ptr] !== 0 then panic
-    MOV A, [__core_vm_allocated]
-    ADD A, [__core_vm_stack_ptr]
-    CMP [A], 0
-    JNZ __core_machine_push_panic
-    MOV A, [__core_vm_memory]
-    ADD A, [__core_vm_stack_ptr] ; ref = &vm->memory[vm->stack_ptr]
-    MOV [A], [BP + 3]          ; *ref = n
-    INC [__core_vm_stack_ptr]    ; vm->stack_ptr++
-    MOV SP, BP
-    POP BP
-    POP A
-    RET 1
+    mov A, [__core_vm_allocated]
+    add A, [__core_vm_stack_ptr]
+    cmp [A], 0
+    jnz __core_machine_push_panic
+    mov A, [__core_vm_memory]
+    add A, [__core_vm_stack_ptr] ; ref = &vm->memory[vm->stack_ptr]
+    mov [A], [BP + 3]          ; *ref = n
+    inc [__core_vm_stack_ptr]    ; vm->stack_ptr++
+    mov SP, BP
+    pop BP
+    pop A
+    ret 1
 __core_machine_push_panic:
-    PUSH __CORE_STACK_HEAP_COLLISION
-    CALL __core_panic
+    push __CORE_STACK_HEAP_COLLISION
+    call __core_panic
 
 ;; int __core_machine_pop()
 ;; pop n of the stack
 __core_machine_pop:
-    PUSH B
-    PUSH BP
-    MOV BP, SP
-    CMP [__core_vm_stack_ptr], 0
-    JZ __core_machine_pop_panic
-    MOV A, [__core_vm_memory]    ; int * loc = vm->memory
-    ADD A, [__core_vm_stack_ptr] ; loc += vm->stack_ptr
-    DEC A                      ; loc -= 1
-    MOV B, [A]                 ; int b = *loc
-    MOV [A], 0                 ; *loc = 0 // do we really need to 0 it?
-    DEC [__core_vm_stack_ptr]    ; vm->stack_ptr--
-    MOV A, B                   ; return values are set in the A register
-    MOV SP, BP
-    POP BP
-    POP B
-    RET
+    push B
+    push BP
+    mov BP, SP
+    cmp [__core_vm_stack_ptr], 0
+    jz __core_machine_pop_panic
+    mov A, [__core_vm_memory]    ; int * loc = vm->memory
+    add A, [__core_vm_stack_ptr] ; loc += vm->stack_ptr
+    dec A                      ; loc -= 1
+    mov B, [A]                 ; int b = *loc
+    mov [A], 0                 ; *loc = 0 // do we really need to 0 it?
+    dec [__core_vm_stack_ptr]    ; vm->stack_ptr--
+    mov A, B                   ; return values are set in the A register
+    mov SP, BP
+    pop BP
+    pop B
+    ret
 __core_machine_pop_panic:
-    PUSH __CORE_STACK_UNDERFLOW
-    CALL __core_panic
+    push __CORE_STACK_UNDERFLOW
+    call __core_panic
 
 ;; void __core_machine_store(int size)
 ;; pop address of the stack
@@ -290,162 +369,187 @@ __core_machine_pop_panic:
 ;;    pop value off the stack
 ;;    write it to address + i
 __core_machine_store:
-    PUSH A
-    PUSH B
-    PUSH C
-    PUSH D
-    PUSH BP
-    MOV BP, SP
-    CALL __core_machine_pop        ; int * addr = __core_machine_pop()
-    ADD A, [__core_vm_memory] ; addr += vm->memory
-    MOV C, A                ; // move addr to a different register
-    MOV B, [BP + 6]         ; int i = size
-    DEC B                   ; i -= 1
+    push A
+    push B
+    push C
+    push D
+    push BP
+    mov BP, SP
+    call __core_machine_pop        ; int * addr = __core_machine_pop()
+    add A, [__core_vm_memory] ; addr += vm->memory
+    mov C, A                ; // move addr to a different register
+    mov B, [BP + 6]         ; int i = size
+    dec B                   ; i -= 1
 __core_machine_store_loop:
-    CMP B, 0                ;   while (i >= 0)
-    JL __core_machine_store_return
-    CALL __core_machine_pop        ;   int value = __core_machine_pop()
-    MOV D, C                ;   int * loc = addr
-    ADD D, B                ;   loc += i
-    MOV [D], A              ;   *loc = value
-    DEC B                   ;   i--
-    JMP __core_machine_store_loop
+    cmp B, 0                ;   while (i >= 0)
+    jl __core_machine_store_return
+    call __core_machine_pop        ;   int value = __core_machine_pop()
+    mov D, C                ;   int * loc = addr
+    add D, B                ;   loc += i
+    mov [D], A              ;   *loc = value
+    dec B                   ;   i--
+    jmp __core_machine_store_loop
 __core_machine_store_return:
-    MOV SP, BP
-    POP BP
-    POP D
-    POP C
-    POP B
-    POP A
-    RET 1
+    mov SP, BP
+    pop BP
+    pop D
+    pop C
+    pop B
+    pop A
+    ret 1
 
 ;; void __core_machine_load(int size)
 ;; load size amount of integers from popped address
 __core_machine_load:
-    PUSH A
-    PUSH B
-    PUSH C
-    PUSH D
-    PUSH BP
-    MOV BP, SP
-    CALL __core_machine_pop        ; int * addr = __core_machine_pop()
-    ADD A, [__core_vm_memory] ; addr += vm->memory
-    MOV C, A                ; move addr to a different register
-    MOV B, 0                ; int i = 0
+    push A
+    push B
+    push C
+    push D
+    push BP
+    mov BP, SP
+    call __core_machine_pop        ; int * addr = __core_machine_pop()
+    add A, [__core_vm_memory] ; addr += vm->memory
+    mov C, A                ; move addr to a different register
+    mov B, 0                ; int i = 0
 __core_machine_load_loop:
-    CMP B, [BP + 6]         ; while (i < size)
-    JGE __core_machine_load_return
-    MOV D, C                ; int * loc = addr
-    ADD D, B                ; loc += i
-    PUSH [D]                ; int value = *loc
-    CALL __core_machine_push       ; __core_machine_push(value)
-    INC B                   ; i++
-    JMP __core_machine_load_loop
+    cmp B, [BP + 6]         ; while (i < size)
+    jge __core_machine_load_return
+    mov D, C                ; int * loc = addr
+    add D, B                ; loc += i
+    push [D]                ; int value = *loc
+    call __core_machine_push       ; __core_machine_push(value)
+    inc B                   ; i++
+    jmp __core_machine_load_loop
 __core_machine_load_return:
-    MOV SP, BP
-    POP BP
-    POP D
-    POP C
-    POP B
-    POP A
-    RET 1
+    mov SP, BP
+    pop BP
+    pop D
+    pop C
+    pop B
+    pop A
+    ret 1
 
 ;; void __core_machine_add()
 ;; pop 2 values, add them and push the result
 __core_machine_add:
-    PUSH A
-    PUSH B
-    PUSH BP
-    MOV BP, SP
-    CALL __core_machine_pop
-    MOV B, A
-    CALL __core_machine_pop
-    ADD A, B
-    PUSH A
-    CALL __core_machine_push
-    MOV SP, BP
-    POP BP
-    POP B
-    POP A
-    RET
+    push A
+    push B
+    push BP
+    mov BP, SP
+    call __core_machine_pop
+    mov B, A
+    call __core_machine_pop
+    add A, B
+    push A
+    call __core_machine_push
+    mov SP, BP
+    pop BP
+    pop B
+    pop A
+    ret
 
 ;; void __core_machine_subtract()
 ;; pop 2 values, subtract them and push the result
 __core_machine_subtract:
-    PUSH A
-    PUSH B
-    PUSH BP
-    MOV BP, SP
-    CALL __core_machine_pop
-    MOV B, A
-    CALL __core_machine_pop
-    SUB A, B
-    PUSH A
-    CALL __core_machine_push
-    MOV SP, BP
-    POP BP
-    POP B
-    POP A
-    RET
+    push A
+    push B
+    push BP
+    mov BP, SP
+    call __core_machine_pop
+    mov B, A
+    call __core_machine_pop
+    sub A, B
+    push A
+    call __core_machine_push
+    mov SP, BP
+    pop BP
+    pop B
+    pop A
+    ret
 
 ;; void __core_machine_sign()
 ;; pop a value of the stack, if it is 0 or greater push 1, else push -1
 __core_machine_sign:
-    PUSH A
-    PUSH B
-    PUSH BP
-    MOV BP, SP
-    CALL __core_machine_pop
-    CMP A, 0
-    JGE __core_machine_sign_ge
+    push A
+    push B
+    push BP
+    mov BP, SP
+    call __core_machine_pop
+    cmp A, 0
+    jge __core_machine_sign_ge
 __core_machine_sign_l:
-    PUSH -1
-    JMP __core_machine_sign_push
+    push -1
+    jmp __core_machine_sign_push
 __core_machine_sign_ge:
-    PUSH 1
+    push 1
 __core_machine_sign_push:
-    CALL __core_machine_push
-    MOV SP, BP
-    POP BP
-    POP B
-    POP A
-    RET
+    call __core_machine_push
+    mov SP, BP
+    pop BP
+    pop B
+    pop A
+    ret
 
 ;; void __core_machine_multiply()
 ;; pop 2 values, multiply them and push the result
 __core_machine_multiply:
-    PUSH A
-    PUSH B
-    PUSH BP
-    MOV BP, SP
-    CALL __core_machine_pop
-    MOV B, A
-    CALL __core_machine_pop
-    MUL B                 ; will multiply register A with operand, result is a 32-bit integer in Y:A
-    PUSH A
-    CALL __core_machine_push
-    MOV SP, BP
-    POP BP
-    POP B
-    POP A
-    RET
+    push A
+    push B
+    push BP
+    mov BP, SP
+    call __core_machine_pop
+    mov B, A
+    call __core_machine_pop
+    mul B                 ; will multiply register A with operand, result is a 32-bit integer in Y:A
+    push A
+    call __core_machine_push
+    mov SP, BP
+    pop BP
+    pop B
+    pop A
+    ret
 
 ;; void __core_machine_divide()
 ;; pop 2 values, divide them and push the result
 __core_machine_divide:
-    PUSH A
-    PUSH B
-    PUSH BP
-    MOV BP, SP
-    MOV Y, 0
-    CALL __core_machine_pop
-    MOV B, A
-    CALL __core_machine_pop
-    DIV B                 ; will divide register Y:A with source, result in A, remainder in Y
-    PUSH A
-    CALL __core_machine_push
-    MOV SP, BP
-    POP BP
-    POP B
-    POP A
-    RET
+    push A
+    push B
+    push BP
+    mov BP, SP
+    mov Y, 0
+    call __core_machine_pop
+    mov B, A
+    call __core_machine_pop
+    div B                 ; will divide register Y:A with source, result in A, remainder in Y
+    push A
+    call __core_machine_push
+    mov SP, BP
+    pop BP
+    pop B
+    pop A
+    ret
+
+;; execution on a server tick always starts at .text with the registers and status flags reset
+;; a server reset erase the memory and floppy contents
+;; #[entry] void __core_start()
+.text
+__core_start:
+    ;; if flag is set restore from previous sleep call
+    cmp [__core_sleep_wake_flag], 1
+    jz __core_wake
+
+    ;; initialize the oak virtual machine
+    call __core_machine_new
+
+    ;; call the user defined enry point
+    call __core_main
+
+    ;; if we return from main we call __core_spin
+    ;; if the user wants to be able to keep executing code main should never return
+    call __core_spin
+
+;; the compiler will genererate the following
+;; constants are not hoisted so we have to waste size to this
+;; __core_global_scope_size: DW $ ;; amount of global variables
+;; __core_vm_capacity: DW $       ;; capacity the vm should be initialized with
+;; __core_main: ...               ;; oak program entrypoint. after the runtime is initialized it will call this function

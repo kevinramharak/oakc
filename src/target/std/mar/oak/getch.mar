@@ -64,7 +64,7 @@ __oak_getch_fetch:
     hwi HWID_KEYBOARD
     cmp B, 0   ; if the result is zero there was no character in the keyboard buffer
     jnz __oak_getch_newline_check
-    call __core_sleep ; to prevent spinning and draining the server / have the server terminate our execution we use sleep
+    ;;call __core_sleep ; to prevent spinning and draining the server / have the server terminate our execution we use sleep
     jmp __oak_getch_fetch
 __oak_getch_newline_check:
     ;; NOTE: oakc examples ignore '\r' and work with '\n' characters, so we do a switcheroo

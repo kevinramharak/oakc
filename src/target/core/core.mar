@@ -1,7 +1,7 @@
 ;; TODO: being forced to generate this in a fixed order is annoying and removes modularity. Keep in check with any multi file features for MAR
 
 ;; we want the runtime to be be able to host 'itself' by not depending on any dependencies
-;; other than that it should only implement the virtual machine and any required initialization code
+;; it should only implement the vm and any nessesary code and variables to run the oak program
 
 ;; Setting the binary offset to 0 makes sure our .data section starts at address 0x0000
 org 0
@@ -16,13 +16,16 @@ _0x0000:
     ;; division by zero causes an interrupt
     __core_interrupt_divide_by_zero: dw 0x0153
 _0x0001:
-    ;; not implemented server side
+    ;; not implemented
     __core_interrupt_trap: dw 0x0153
 _0x0002:
-    ;; not implemented server side
+    ;; not implemented
     __core_interrupt_nmi: dw 0x0153
 _0x0003:
-    ;; not implemented server side
+    ;; NOTE: INT 3 is a special case for the server that starts the debugging mode.
+    ;; NOTE: This memory location will never actually be used as a jump location for an interrupt
+    ;; TODO: use this location for a static variable so we dont waste its space
+    ;; not implemented server
     __core_interrupt_break_point: dw 0x0153
 _0x0004:
     ;; this interrupt requires a INTO instruction and the overflow flag to be set
@@ -39,47 +42,64 @@ _0x0021:
     ;; keep 0x20 - 0x3f reserverd for future (hardware) interrupt handlers
     __core_interrupt_vector_table_hardware: dw 0x001F dup(0x0153)
 _0x0040:
-    ;; keep 0x40 - 0x40 reserved for core interrupt handlers
+    ;; keep 0x40 - 0x43 reserved for core interrupt handlers
     __core_interrupt_vector_table_core:
     ;; software interrupt for a panic of unkown reason
-    __core_interrupt_panic_unkown: dw 0x0000
+    __core_interrupt_panic_unkown: dw 0x0153
+_0x0041:
     ;; software interrupt for a panic caused by a stack and heap collision
-    __core_interrupt_panic_stack_heap_collision: dw 0x0000
+    __core_interrupt_panic_stack_heap_collision: dw 0x0157
+_0x0042:
     ;; software interrupt for a panic caused by having no more free memory
-    __core_interrupt_panic_no_free_memory: dw 0x0000
+    __core_interrupt_panic_no_free_memory: dw 0x015B
+_0x0043:
     ;; software interrupt for a panic caused by a stack underflow
-    __core_interrupt_panic_stack_underflow: dw 0x0000
-    ;; 0x41 - 0x7f is open for software interrupts
+    __core_interrupt_panic_stack_underflow: dw 0x015F
+    ;; 0x44 - 0x7f is open for software interrupts
+_0x0044:
     __core_interrupt_vector_table_software:
-    dw 0x3E dup(0x0153)
+    dw 0x3C dup(0x0153)
     ;; TODO: figure out how the stdlib is going to reserve interrupts
     ;; probably by owning the software interrupt table and providing an interface to interact with it
 _0x0080:
     ;; padding
-    dw 0xCE dup(0xdead) ;; this padding can be used for core static variables / data
+    ;; this padding can be used for core static variables / data
+    dw 0x7A dup(0xdead)
     ;; padding
-_0x014D:
+_0x00FA:
     ;; static variables used by __core_* functions
+    ;; static struct machine {
+    __core_vm:
+    ;;   int * memory
+    __core_vm_memory: dw 0x0000
+    ;;   bool * allocated
+    __core_vm_allocated: dw 0x0000
+    ;;   int capacity
+    __core_vm_capacity: dw 0x0000
+    ;;   int base_ptr
+    __core_vm_base_ptr: dw 0x0000
+    ;;   int stack_ptr
+    __core_vm_stack_ptr: dw 0x0000
+    ;; } vm;
     ;; static const char * __core_panic_unkown_message
     __core_panic_unkown_message: dw "\nERR_UNKNOWN", 0 ;; 13 length
     ;; static const char * __core_panic_stack_heap_collision
     __core_panic_stack_heap_collision: dw "\nERR_STACK_HEAP_COLLISION", 0 ;; 26 length
     ;; static const char * __core_panic_no_free_memory
-    __core_panic_no_free_memory: dw "\nERR_NO_FREE_MEMORY", 0 ;; 22 length
+    __core_panic_no_free_memory: dw "\nERR_NO_FREE_MEMORY", 0 ;; 20 length
     ;; static const char * __core_panic_stack_underflow
     __core_panic_stack_underflow: dw "\nERR_STACK_UNDERFLOW", 0 ;; 21 length
-    ;; static bool __core_sleep_wake_flag
-    __core_sleep_wake_flag: dw 0x0000
-    ;; static size_t __core_BP_cache
-    __core_sleep_BP_cache: dw 0x0000
-    ;; static size_t __core_SP_cache
-    __core_sleep_SP_cache: dw 0x0000
+    ;; static void * __core_jump_on_wake
+    __core_jump_on_wake: dw 0x0000 ;; 0 represents no jump, non-0 represent a jump location
 _0x0150:
     ;; 3 words reserved for execution cost variables. These are set by the server executing the code
     ;; see https://github.com/simon987/Much-Assembly-Required/blob/master/Server/src/main/java/net/simon987/server/assembly/CPU.java#L194
     __core_execution_cost_addr: dw 0x0000
     ;; 32 bit signed integer
     __core_executed_instruction_count: dw 0x0000, 0x0000
+
+;; defining this constant should allow stdlib or any other implementation to figure out if an entry in the ivt is used or not
+__CORE_INTERRUPT_HANDLER_DEFAULT equ 0x0153
 
 ;; NOTE: at the moment we have to compute some of these interrupt addresses because the assembly cant use labels as a DW argument
 ;; putting it right here after static data makes it easy to calculate the address
@@ -89,7 +109,8 @@ _0x0153:
 ;; this prevents unhandled interrupts from jumping to random locations
 __core_interrupt_handler_default:
     ;; either interrupt to panic_unknown or to panic_unhandled_interrupt?
-    jmp __core_interrupt_panic_unkown
+    ;; TODO: make a decision on what this should do
+    ;; jmp __core_interrupt_panic_unhandled_interrupt
 
 ;; #[interrupt_handler] void __core_interrupt_handler_panic_unkown()
 __core_interrupt_handler_panic_unkown:
@@ -99,26 +120,31 @@ __core_interrupt_handler_panic_unkown:
 __CORE_STACK_HEAP_COLLISION EQU 1
 __CORE_NO_FREE_MEMORY EQU 2
 __CORE_STACK_UNDERFLOW EQU 3
+
+_0x0157:
 ;; #[interrupt_handler] #[no_return] void __core_interrupt_handler_panic_stack_heap_collision()
 __core_interrupt_handler_panic_stack_heap_collision:
     push __CORE_STACK_HEAP_COLLISION
     call __core_panic
+_0x015B:
 ;; #[interrupt_handler] #[no_return] void __core_interrupt_handler_panic_no_free_memory()
 __core_interrupt_handler_panic_no_free_memory:
     push __CORE_STACK_HEAP_COLLISION
     call __core_panic
+_0x015F:
 ;; #[interrupt_handler] #[no_return] void __core_interrupt_handler_panic_stack_underflowy()
 __core_interrupt_handler_panic_stack_underflow:
     push __CORE_STACK_UNDERFLOW
     call __core_panic
+_0x0163:
 
 ;; #[no_return] void __core_panic(int error_code)
 ;; prints a user friendly error message and then exits the program
 ;; in our case this means spinning forever
 __core_panic:
-    push BP
-    mov BP, SP
-    mov A, [BP + 2]
+    ;; [SP] = return address
+    ;; [SP + 1] = int error_code
+    MOV A, [SP + 1]
     mov X, __core_panic_unkown_message
 __core_panic_case_1:
     cmp A, 1
@@ -144,69 +170,15 @@ __core_panic_scan:
     inc B
     cmp [X], 0
     jz __core_spin
-    cmp B, 8
+    cmp B, 9
     jz __core_panic_write
     jmp __core_panic_scan
 
-;; #[no_return] void __core_spin()
-;; never returns execution to the caller
-__core_spin:
-    call __core_sleep
-    jmp __core_spin
-
-;; void __core_sleep()
-;; saves the registers and status flags before and set a flag before ending the current tick with `BRK`
-;; on a new tick excution will start at .text.
-;; if the flag is set it will restore the saved state before returning execution to the original caller
-__core_sleep:
-    ;; save status and register state
-    push A
-    push B
-    push C
-    push D
-    push X
-    push Y
-    pushf
-    ;; store stack base pointer and stack pointer
-    mov [__core_sleep_BP_cache], BP
-    mov [__core_sleep_SP_cache], SP
-    ;; set the flag
-    mov [__core_sleep_wake_flag], 1
-    ;; wait till until next tick
-    brk
-    ;; execution will resume here
-__core_wake:
-    ;; clear the flag
-    mov [__core_sleep_wake_flag], 0
-    ;; restore stack base pointer and stack pointer
-    mov SP, [__core_sleep_SP_cache]
-    mov BP, [__core_sleep_BP_cache]
-    ;; restore register state
-    popf
-    pop Y
-    pop X
-    pop D
-    pop C
-    pop B
-    pop A
-    ;; since `call sleep` never executed a ret instruction this will restore execution after the most recent executed `call sleep` instruction
-    ret
-
-;; virtual machine implementation
-;; based on the vm implementation in 'std.c'
-
-;; stack pointer starts at mem[65535] goes towards mem[0]
-__CORE_STACK_START equ 0xffff
+;; void __core_machine_new()
+;; intializes the virtual machine located at the label __core_vm
 ;; we expected a label to be at the end of all code named `__core_heap_start`
-
-;; static struct machine * vm
-__core_vm_memory: dw 0x0000 ; int * memory
-__core_vm_allocated: dw 0x0000 ; bool * allocated
-__core_vm_capacity: dw 0x0000 ; int capacity
-__core_vm_stack_ptr: dw 0x0000 ; int stack_ptr
-
-;; initialize virtual machine struct
 __core_machine_new:
+    ;; TODO: currently it uses compiler generated words and labels to intialize, those really should be compile time constants
     ;; TODO: write an heap implementation that doesnt have a 100% memory overhead
     ;; compiler figures out how big the tape must be and defines it as `__core_vm_capacity: dw value`
     mov [__core_vm_capacity], [__core_vm_capacity]
@@ -220,6 +192,123 @@ __core_machine_new:
     ;; the c impl does a for loop with push(0) for this size, but the end result is the same as setting the stack ptr to this size
     mov [__core_vm_stack_ptr], [__core_global_scope_size]
     ret
+
+;; void __core_machine_load_base_ptr()
+;; push the base pointer onto the stack
+__core_machine_load_base_ptr:
+    push [__core_vm_base_ptr]
+    call __core_machine_push
+    ret
+
+;; void __core_machine_establish_stack_frame(size_t arg_size, size_t local_scope_size)
+__core_machine_establish_stack_frame:
+    int 3
+    push BP
+    mov BP, SP
+    
+    ;; [BP] == BP
+    ;; [BP + 1] == return address
+    ;; [BP + 2] == size_t arg_size
+    ;; [BP + 3] == size_t local_scope_size
+
+    ;; reserve space on the stack for the function arguments
+    mov X, SP
+    sub SP, [BP + 2]
+    ; int args[arg_size]
+    ; int * ptr = args[args.length - 1]
+
+    ;; Pop the arguments' values off of the stack
+    ; while (ptr != args) {
+    ;   *ptr = machine_pop();
+    ;    ptr -= 1;
+    ; }
+__core_machine_establish_stack_frame_preserve_args_loop:
+    cmp X, SP
+    jz __core_machine_establish_stack_frame_preserve_args_break
+    call __core_machine_pop
+    mov [X], A
+    dec X
+    jmp __core_machine_establish_stack_frame_preserve_args_loop
+__core_machine_establish_stack_frame_preserve_args_break:
+
+    ;; Push the current base pointer onto the stack so that
+    ;; when this function returns, it will be able to resume
+    ;; the current stack frame
+    call __core_machine_load_base_ptr
+
+    ;; Set the base pointer to the current stack pointer to 
+    ;; begin the stack frame at the current position on the stack.
+    mov [__core_vm_base_ptr], [__core_vm_stack_ptr]
+
+    ;; allocate space for local variables
+    ;; NOTE: the vm impl in C actually pushes 0's
+    add [__core_vm_stack_ptr], [BP + 3]
+
+    ;; Push the arguments back onto the stack for use by the current function
+__core_machine_establish_stack_frame_restore_args_loop:
+    cmp [BP + 2], 0
+    jz __core_machine_establish_stack_frame_restore_args_return
+    call __core_machine_push
+    dec [BP + 2]
+    jmp __core_machine_establish_stack_frame_restore_args_loop
+
+__core_machine_establish_stack_frame_restore_args_return:
+    mov SP, BP
+    pop BP
+    ret 2
+
+;; void __core_machine_end_stack_frame(size_t return_size, size_t local_scope_size);
+__core_machine_end_stack_frame:
+    int 3
+    push BP
+    mov BP, SP
+    
+    ;; [BP] == BP
+    ;; [BP + 1] == return address
+    ;; [BP + 2] == size_t return_size
+    ;; [BP + 3] == size_t local_scope_size
+
+    ;; reserve space on the stack for the return value
+    mov X, SP
+    sub SP, [BP + 2]
+    ; int return_value[return_size]
+    ; int * ptr = return_value[return_value.length - 1]
+
+    ;; Pop the returned values off of the stack
+    ; while (ptr != return_value) {
+    ;   *ptr = machine_pop();
+    ;    ptr -= 1;
+    ; }
+__core_machine_establish_stack_frame_preserve_return_value_loop:
+    cmp X, SP
+    jz __core_machine_establish_stack_frame_preserve_return_value_clear_stack
+    call __core_machine_pop
+    mov [X], A
+    dec X
+    jmp __core_machine_establish_stack_frame_preserve_return_value_loop
+
+__core_machine_establish_stack_frame_preserve_return_value_clear_stack:
+    ;; Discard the memory setup by the stack frame
+    ;; NOTE: the c impl actually pops these (and pop 0's out the memory)
+    sub [__core_vm_stack_ptr], [BP + 3]
+
+    ;; Retrieve the parent function's base pointer to resume the function
+    call __core_machine_pop
+    mov [__core_vm_base_ptr], A
+    
+    ;; Finally, push the returned value back onto the stack for use by
+    ;; the parent function.
+__core_machine_establish_stack_frame_restore_return_value_loop:
+    cmp [BP + 2], 0
+    jz __core_machine_establish_stack_frame_restore_return_value_return
+    call __core_machine_push
+    DEC [BP + 2]
+    jmp __core_machine_establish_stack_frame_restore_return_value_loop
+
+__core_machine_establish_stack_frame_restore_return_value_return:
+    mov SP, BP
+    pop BP
+    ret 2
 
 ;; void __core_machine_allocate()
 ;; pop size of the stack
@@ -282,7 +371,7 @@ __core_machine_allocate_loop_panic:
     push __CORE_NO_FREE_MEMORY
     call __core_panic
 
-;; double __core_machine_free()
+;; void __core_machine_free()
 __core_machine_free:
     push B
     push C
@@ -534,9 +623,9 @@ __core_machine_divide:
 ;; #[entry] void __core_start()
 .text
 __core_start:
-    ;; if flag is set restore from previous sleep call
-    cmp [__core_sleep_wake_flag], 1
-    jz __core_wake
+    ;; if * __core_jump_on_wake != null then jump to that pointer
+    cmp [__core_jump_on_wake], 0
+    jnz [__core_jump_on_wake]
 
     ;; initialize the oak virtual machine
     call __core_machine_new
@@ -544,9 +633,10 @@ __core_start:
     ;; call the user defined enry point
     call __core_main
 
-    ;; if we return from main we call __core_spin
-    ;; if the user wants to be able to keep executing code main should never return
-    call __core_spin
+__core_spin:
+    ;; set the __core_jump_on_wake pointer to the next instruction
+    mov [__core_jump_on_wake], __core_spin
+    brk
 
 ;; the compiler will genererate the following
 ;; constants are not hoisted so we have to waste size to this

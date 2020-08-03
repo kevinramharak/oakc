@@ -3,10 +3,7 @@
 ;; Address:   0x000D
 ;; Id:        0x000D
 ;; Docs:      https://github.com/simon987/Much-Assembly-Required/wiki/(Hardware)-Universal-Com-Port
-;; NOTE: a #[sleep] attribute can call the the `__core_sleep` routine one or more times before returning execution to the caller
 ;;/
-
-;; NOTE: i try to be smart and use as few instructions as possible. It might be a bad idea, but id like to try and keep the stdlib as compact as possible
 
 __MAR_HWID_COMPORT equ 0x000D
 
@@ -16,6 +13,7 @@ __MAR_COMPORT_FRONT_PORT_OUT equ 2 ;; / Copies 8 words starting at address X to 
 __MAR_COMPORT_SELF_OUT       equ 3 ;; / Copies 8 words starting at address X to the internal message buffer. Sets/resets B to indicate success
 __MAR_COMPORT_CONSOLE_CLEAR  equ 4 ;; / Clears the console
 
+;; TODO: its 40 * 40. rewrite to work with an internal 8 word buffer
 __MAR_COMPORT_BUFFER_SIZE equ 40
 
 ;; static char[40] __mar_comport_buffer
@@ -129,7 +127,7 @@ __mar_comport_write_return:
     pop B
     ret 2
 
-;; #[sleep] size_t __mar_comport_write_blocking(const char * str, size_t length)
+;; #[can_sleep] size_t __mar_comport_write_blocking(const char * str, size_t length)
 ;; writes the `length` amount of characters from `str` to the `__mar_comport_buffer`
 ;; it blocks execution until all characters have been written to the internal hardware buffer
 ;; it might take one more ticks before execution returns
@@ -157,7 +155,7 @@ __mar_comport_write_blocking_loop:           ;
     jmp __mar_comport_write_blocking_loop
 __mar_comport_write_blocking_flush:
     call __mar_comport_flush 
-    call __core_sleep
+;;    call __core_sleep
     cmp A, 0
     ;; TODO: rewrite the clearing of [__mar_comport_buffer_length], preferably flush with  pre_sleep hook and reset length with a post_sleep hook
     jz __mar_comport_write_blocking_flush    ; if flushing failed, the flush call itself will adjust the length and buffer contents

@@ -96,52 +96,72 @@ __core_main:
         String::from("    RET\n")
     }
 
+    fn establish_stack_frame(&self, arg_size: i32, local_scope_size: i32) -> String {
+        String::from(format!(
+r#"    push {}
+    push {}
+    call __core_machine_establish_stack_frame
+"#, local_scope_size, arg_size))
+    }
+
+    fn end_stack_frame(&self, return_size: i32, local_scope_size: i32) -> String {
+        String::from(format!(
+r#"    push {}
+    push {}
+    call __core_machine_end_stack_frame
+"#, local_scope_size, return_size))
+    }
+
+    fn load_base_ptr(&self) -> String {
+        String::from("    call __core_machine_load_base_ptr\n")
+    }
+
     fn push(&self, n: f64) -> String {
         String::from(format!(
-r##"    PUSH {}
-    CALL __core_machine_push
+r##"    push {}
+    call __core_machine_push
 "##, n as i16))
     }
 
     fn add(&self) -> String {
-        String::from("    CALL __core_machine_add\n")
+        String::from("    call __core_machine_add\n")
     }
 
     fn subtract(&self) -> String {
-        String::from("    CALL __core_machine_subtract\n")
+        String::from("    call __core_machine_subtract\n")
     }
     
     fn multiply(&self) -> String {
-        String::from("    CALL __core_machine_multiply\n")
+        String::from("    call __core_machine_multiply\n")
     }
     
     fn divide(&self) -> String {
-        String::from("    CALL __core_machine_divide\n")
+        String::from("    call __core_machine_divide\n")
     }
 
     fn sign(&self) -> String {
-        String::from("    CALL __core_machine_sign\n")
+        String::from("    call __core_machine_sign\n")
     }
 
     fn allocate(&self) -> String {
-        String::from("    CALL __core_machine_allocate\n")
+        String::from("    call __core_machine_allocate\n")
     }
 
     fn free(&self) -> String {
-        String::from("    CALL __core_machine_free\n")
+        String::from("    call __core_machine_free\n")
     }
 
     fn store(&self, size: i32) -> String {
         String::from(format!(
-r##"    PUSH {}
-    CALL __core_machine_store
+r##"    push {}
+    call __core_machine_store
 "##, size as i16))
     }
 
     fn load(&self, size: i32) -> String {
         String::from(format!(
-r##"    PUSH {}
-    CALL __core_machine_load
+r##"    push {}
+    call __core_machine_load
 "##, size as i16))
     }
 
@@ -152,16 +172,16 @@ r##"    PUSH {}
     fn fn_definition(&self, name: String, body: String) -> String {
         String::from(format!(r##"
 {}:
-{}    RET ;; returning from {}
+{}    ret ;; returning from {}
 "##, name, body, name))
     }
 
     fn call_fn(&self, name: String) -> String {
-        String::from(format!("    CALL {} ;; calling oak function\n", name))
+        String::from(format!("    call {} ;; calling oak function\n", name))
     }
 
     fn call_foreign_fn(&self, name: String) -> String {
-        String::from(format!("    CALL {} ;; calling foreign function\n", name))
+        String::from(format!("    call {} ;; calling foreign function\n", name))
     }
 
     fn begin_while(&self) -> String {
@@ -169,9 +189,9 @@ r##"    PUSH {}
         unsafe { loop_identifiers.push(id); unique += 1; }
         let str = String::from(format!(
 r#"begin_while_{}:
-    CALL __core_machine_pop
-    CMP A, 0
-    JZ end_while_{}
+    call __core_machine_pop
+    cmp A, 0
+    jz end_while_{}
 "#, unsafe { id }, unsafe { id }));
         str
     }
@@ -179,7 +199,7 @@ r#"begin_while_{}:
     fn end_while(&self) -> String {
         let id = unsafe { loop_identifiers.pop().unwrap() };
         let str = String::from(format!(
-r#"    JMP begin_while_{}
+r#"    jmp begin_while_{}
 end_while_{}:
 "#, unsafe { id }, unsafe { id }));
         str

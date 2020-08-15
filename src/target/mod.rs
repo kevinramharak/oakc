@@ -4,6 +4,8 @@ mod go;
 pub use go::Go;
 mod mar;
 pub use mar::MAR;
+mod ts;
+pub use ts::TS;
 
 pub trait Target {
     fn get_name(&self) -> char;

@@ -8,7 +8,7 @@
 - B - callee saved
 - C - callee saved
 - D - callee saved
-- X - caller saved
-- Y - caller saved
+- X - callee saved
+- Y - callee saved
 - BP
 - SP

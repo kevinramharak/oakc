@@ -6,5 +6,5 @@
     #[include("../c/string.h.mar.ok")]
     #[include("../mar/comport.mar.ok")]
     // include asm implementation
-    #[extern("_prn_.mar")]
+    #[extern("_prn.mar")]
 }]

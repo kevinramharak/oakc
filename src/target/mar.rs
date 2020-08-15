@@ -78,47 +78,48 @@ impl Target for MAR {
     }
 
     fn core_postlude(&self) -> String {
-        String::from("__core_heap_start:")
+        String::from("__core_heap_start: ;; heap starts at this address")
     }
 
     fn begin_entry_point(&self, global_scope_size: i32, memory_size: i32) -> String {
         // TODO: these should be constants, but because they are after core_prelude they cant be
         String::from(format!(r##"
-__core_global_scope_size: DW {}
-__core_vm_capacity: DW {}
+__core_global_scope_size: dw {} ;; global_scope_size
+__core_init_vm_capacity: dw {} ;; global_scope_size + memory_size ({} + {})
+;; start of entry point
 __core_main:
-"##, global_scope_size as i16, (global_scope_size + memory_size) as i16))
+"##, global_scope_size as i16, (global_scope_size + memory_size) as i16, global_scope_size as i16, memory_size as i16))
     }
 
     fn end_entry_point(&self) -> String {
         // technically we want to get the return value from main and return it to the hosting environment
         // but since we are the host running only the oak program we can ignore it for now
-        String::from("    RET\n")
+        String::from("    RET ;; return from entry point\n")
     }
 
     fn establish_stack_frame(&self, arg_size: i32, local_scope_size: i32) -> String {
         String::from(format!(
-r#"    push {}
-    push {}
+r#"    push {} ;; local_scope_size
+    push {} ;; arg_size
     call __core_machine_establish_stack_frame
 "#, local_scope_size, arg_size))
     }
 
     fn end_stack_frame(&self, return_size: i32, local_scope_size: i32) -> String {
         String::from(format!(
-r#"    push {}
-    push {}
+r#"    push {} ;; local_scope_size
+    push {} ;; return size
     call __core_machine_end_stack_frame
 "#, local_scope_size, return_size))
     }
 
     fn load_base_ptr(&self) -> String {
-        String::from("    call __core_machine_load_base_ptr\n")
+        String::from("    call __core_machine_load_base_ptr ;; push the base pointer on the stack\n")
     }
 
     fn push(&self, n: f64) -> String {
         String::from(format!(
-r##"    push {}
+r##"    push {} ;; push value on the vm stack
     call __core_machine_push
 "##, n as i16))
     }
@@ -153,14 +154,14 @@ r##"    push {}
 
     fn store(&self, size: i32) -> String {
         String::from(format!(
-r##"    push {}
+r##"    push {} ;; size
     call __core_machine_store
 "##, size as i16))
     }
 
     fn load(&self, size: i32) -> String {
         String::from(format!(
-r##"    push {}
+r##"    push {} ;; size
     call __core_machine_load
 "##, size as i16))
     }
@@ -171,9 +172,9 @@ r##"    push {}
 
     fn fn_definition(&self, name: String, body: String) -> String {
         String::from(format!(r##"
-{}:
+{}:       ;; definition of {}
 {}    ret ;; returning from {}
-"##, name, body, name))
+"##, name, name, body, name))
     }
 
     fn call_fn(&self, name: String) -> String {
@@ -188,10 +189,10 @@ r##"    push {}
         let id: i16 = unsafe { unique };
         unsafe { loop_identifiers.push(id); unique += 1; }
         let str = String::from(format!(
-r#"begin_while_{}:
+r#"__generated_begin_while_{}:
     call __core_machine_pop
     cmp A, 0
-    jz end_while_{}
+    jz __generated_end_while_{}
 "#, unsafe { id }, unsafe { id }));
         str
     }
@@ -199,8 +200,8 @@ r#"begin_while_{}:
     fn end_while(&self) -> String {
         let id = unsafe { loop_identifiers.pop().unwrap() };
         let str = String::from(format!(
-r#"    jmp begin_while_{}
-end_while_{}:
+r#"    jmp __generated_begin_while_{}
+__generated_end_while_{}:
 "#, unsafe { id }, unsafe { id }));
         str
     }

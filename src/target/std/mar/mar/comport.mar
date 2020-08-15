@@ -13,196 +13,168 @@ __MAR_COMPORT_FRONT_PORT_OUT equ 2 ;; / Copies 8 words starting at address X to 
 __MAR_COMPORT_SELF_OUT       equ 3 ;; / Copies 8 words starting at address X to the internal message buffer. Sets/resets B to indicate success
 __MAR_COMPORT_CONSOLE_CLEAR  equ 4 ;; / Clears the console
 
-;; TODO: its 40 * 40. rewrite to work with an internal 8 word buffer
-__MAR_COMPORT_BUFFER_SIZE equ 40
+;; static char[320] __mar_comport_write_buffer // 40 *  8 word wide messages
+__mar_comport_write_buffer: dw 320 dup(0x0000)
+;; static size_t __mar_comport_write_buffer_length //
+__mar_comport_write_buffer_length: dw 0x0000
 
-;; static char[40] __mar_comport_buffer
-;; MAR assembler does not support using constants in dw or dup
-__mar_comport_buffer: dw 40 dup(0x0000)
-;; static unsigned int __mar_comport_buffer_length
-__mar_comport_buffer_length: dw 0x0000
+;; what kind of api do we need
+;; - write(const char * str, size_t length) // write length amount of characters from str to the comport with an intermediate buffer
+;; - flush() // flush the intermediate buffer
+;; ? how big is the intermediate buffer (40 * 40 maybe?) ! yes 40 * 8 = 320 should work best, this way we can remove the hwi interfacing from write()
+;; ? what exactly does flush do                          ! it should interface with the hardware to write the intermediate buffer to the internal one
+;; ?                                                     ! it should return the amount of characters flushed (multiple of 8)
+;; with these 2 calls we can implement stdio in a way that abstracts the write and flush calls, their return values and when to use the sleep functionality
+;; so these 2 calls are just a fixed interface on top of the actual hardware
+;; by using these both and combinining their return values with tick knowledge 
 
-;; int  __mar_comport_flush()
-;; tries to flush the contents of `__mar_comport_buffer` to the internal hardware buffer
-;; returns a 0 on failure, a non-zero value on success
-;; NOTE: the hardware can only have 40 characters in its internal buffer. It only gets cleared on a new game tick.
+;; size_t write(const char * str, size_t length)
+;; a buffered write to the self out port of the comport (console)
+;; returns the amount of characters written
+;; technically this just writes to an internal buffer
+;; needs a flush call to actually write the contents to the internal buffer
+__mar_comport_write:
+    push b
+    push bp
+    mov bp, sp
+
+    ;; [BP] = SP
+    ;; [BP + 1] = B
+    ;; [BP + 2] = return addeess
+    ;; [BP + 3] = const char * str
+    ;; [BP + 4] = size_t length
+    mov a, __mar_comport_write_buffer
+    add a, [__mar_comport_write_buffer_length]
+    mov b, [bp + 3]
+
+__mar_comport_write_loop:
+    cmp [bp + 4], 0
+    jz __mar_comport_write_return
+    cmp [__mar_comport_write_buffer_length], 320
+    jz __mar_comport_write_return
+    mov [a], [b]
+    inc a
+    inc b
+    inc [__mar_comport_write_buffer_length]
+    dec [bp + 4]
+    jmp __mar_comport_write_loop
+__mar_comport_write_return:
+    mov a, [bp + 4]
+    mov sp, bp
+    pop bp
+    pop b
+    ret 2
+
+;; size_t flush()
+;; flushes the buffered `write()` calls to the internal buffer
+;; returns the amount of characters written to the internal buffer
+;; always starts at the start of the buffer
+;; clears the written characters with '\0' and moves any remaining characters to the start of the buffer
 __mar_comport_flush:
-    ;; preserve B and X
+    push bp
+    mov bp, sp
+    ;; setup hwi
+    mov x, __mar_comport_write_buffer
+    mov a, __MAR_COMPORT_SELF_OUT
+    ;; keep flushing until we get a false or if we are at the end of the buffer
+__mar_comport_flush_loop:
+    cmp [__mar_comport_write_buffer_length], 0
+    jle __mar_comport_flush_shift
+    hwi __MAR_HWID_COMPORT
+    cmp b, 0
+    jz __mar_comport_flush_shift
+    add x, 8
+    sub [__mar_comport_write_buffer_length], 8
+    jmp __mar_comport_flush_loop
+__mar_comport_flush_shift:
+    mov b, __mar_comport_write_buffer
+    push x ;; save this to calculate the amount of characters flushed later
+__mar_comport_flush_shift_loop:
+    ;; once we are done flushing we write the remaing part of the buffer to the start of the buffer
+    ;; if we flushed everything x will be equal the length location
+    cmp [__mar_comport_write_buffer_length], 0
+    jz __mar_comport_flush_cleanup
+    cmp x, __mar_comport_write_buffer_length
+    jz __mar_comport_flush_cleanup
+    mov [b], [x]
+    inc b
+    inc x
+    dec [__mar_comport_write_buffer_length]
+    jmp __mar_comport_flush_shift_loop
+__mar_comport_flush_cleanup:
+    ;; adjust the length property to how many unflushed characters are still in the buffer
+    mov [__mar_comport_write_buffer_length], b
+    sub [__mar_comport_write_buffer_length], __mar_comport_write_buffer
+__mar_comport_flush_cleanup_loop:
+    ;; if the buffer is fully flushed b will equal the length location
+    ;; if not b will be at wherever we are done with shifting
+    cmp b, __mar_comport_write_buffer_length
+    jz __mar_comport_flush_return
+    mov [b], 0
+    inc b
+    jmp __mar_comport_flush_cleanup_loop
+__mar_comport_flush_return:
+    ;; return the amount of characters flushed
+    pop a
+    sub a, __mar_comport_write_buffer
+    mov sp, sp
+    pop bp
+    ret
+
+;;; below is a an interface to interact with the hardware interrupts
+
+;; void __mar_comport_buffer_clear()
+;; clears the internal hardware message buffer
+__mar_comport_buffer_clear:
+    mov A, __MAR_COMPORT_BUFFER_CLEAR
+    hwi __MAR_HWID_COMPORT
+    ret
+
+;; size_t __mar_comport_poll(char * dest)
+;; copies all messages (each 8 words) in the internal buffer to the destination
+;; returns the number of messages copied
+__mar_comport_poll:
     push B
     push X
-    push Y
-    mov A, __MAR_COMPORT_SELF_OUT
-    mov X, __mar_comport_buffer
-__mar_comport_flush_loop:
-    ;; TODO: we really shouldnt flush the whole buffer contents. only multiples of 8 up until the length
-    ;; because `__mar_comport_buffer_length` is located right after the BUFFER, we can just do a pointer comparison
-    cmp X, __mar_comport_buffer_length
-    jz  __mar_comport_flush_return
+    mov X, [SP + 3]
+    mov A, __MAR_COMPORT_POLL
     hwi __MAR_HWID_COMPORT
-    cmp B, 0
-    jz __mar_comport_flush_error
-    ;; zero out the written 8 words
-    mov B, X
-    add X, 8
-__mar_comport_flush_clear_loop:
-    cmp B, X
-    jz  __mar_comport_flush_loop
-    mov [B], 0
-    inc B
-    jmp  __mar_comport_flush_clear_loop
-__mar_comport_flush_error:
-    ;; set the error return value
-    mov A, 0
-    ;; if there is an error we want 'shift' the remaining characters to the start of the buffer and set the length accordingly
-    mov B, __mar_comport_buffer
-    mov Y, X
-__mar_comport_flush_error_shift_loop:
-    cmp B, Y
-    jz __mar_comport_flush_error_reset_length
-    mov [B], [X]
-    inc B
-    inc X
-    jmp __mar_comport_flush_error_shift_loop
-__mar_comport_flush_error_reset_length:
-    ;; reset the length
-    mov [__mar_comport_buffer_length], B
-    sub [__mar_comport_buffer_length], __mar_comport_buffer
-__mar_comport_flush_error_clear_loop:
-    ;; and zero out the remainder
-    cmp B, __mar_comport_buffer_length
-    mov [B], 0
-    inc B
-    jz  __mar_comport_flush_return
-    jmp __mar_comport_flush_error_clear_loop
- __mar_comport_flush_return:
-    ;; if there was no failure the value of A is still COMPORT_SELF_OUT (3) and thus a valid return value for success
-    ;; preserve B and X
-    pop Y
+    mov A, B
     pop X
     pop B
     ret
 
-;; size_t __mar_comport_write(const char * str, size_t length)
-;; tries to write the `length` amount of characters from `str` to the `__mar_comport_buffer`
-;; returns the number of characters written
-;; NOTE: `__mar_comport_buffer_length` will never decrement unless ` __mar_comport_flush` is called
-__mar_comport_write:
-    ;; preverse B
-    push B
-    push BP
-    mov BP, SP
-    ;; [BP + 0] = old BP
-    ;; [BP + 1] = old B
-    ;; [BP + 2] = return address
-    ;; [BP + 3] = const char * str
-    ;; [BP + 4] = size_t length
-    ;; const char * source = str
-    mov A, [BP + 3]
-    ;; char * dest = __mar_comport_buffer
-    mov B, __mar_comport_buffer
-    ;; dest += *__mar_comport_buffer_length
-    add B, [__mar_comport_buffer_length]
-__mar_comport_write_loop:
-    ;; if we have copied `length` amount of characters we are done
-    cmp [BP + 4], 0
-    jz __mar_comport_write_return
-    ;; if we cannot write more characters to the buffer we return early
-    ;; because `__mar_comport_buffer_length` is located right after the bfufer, we can just do a pointer comparison
-    cmp B, __mar_comport_buffer_length
-    jz __mar_comport_write_return
-    ;; *dest = *source
-    mov [B], [A]
-    inc A
-    inc B
-    dec [BP + 4]
-    jmp __mar_comport_write_loop
-__mar_comport_write_return:
-    ;; so A is somewhere inside the string where we stopped writing
-    ;; if we do `loc - str` we get the amount of characters written inside our return register
-    sub A, [BP + 3]
-    ;; add the written amount of characters to `*__mar_comport_buffer_length`
-    add [__mar_comport_buffer_length], A
-    mov SP, BP
-    pop BP
-    pop B
-    ret 2
-
-;; #[can_sleep] size_t __mar_comport_write_blocking(const char * str, size_t length)
-;; writes the `length` amount of characters from `str` to the `__mar_comport_buffer`
-;; it blocks execution until all characters have been written to the internal hardware buffer
-;; it might take one more ticks before execution returns
-;; returns the number of characters written
-__mar_comport_write_blocking:
-    push B
-    push BP
-    mov BP, SP
-    ;; [BP + 0] = old BP
-    ;; [BP + 1] = old B
-    ;; [BP + 2] = return address
-    ;; [BP + 3] = const char * str
-    ;; [BP + 4] = size_t length
-    mov B, [BP + 3]                          ; const char * src
-__mar_comport_write_blocking_loop:           ;
-    cmp [BP + 4], 0                          ; while (length != 0)
-    jz __mar_comport_write_blocking_flush_before_return
-    push [BP + 4]                            ; 
-    push B                                   ;
-    call __mar_comport_write                 ;     size_t amount_written = __mar_comport_write(src, length)
-    add B, A                                 ;     src += amount_written
-    sub [BP + 4], A                          ;     length -= amount_written
-    cmp [__mar_comport_buffer_length], __MAR_COMPORT_BUFFER_SIZE
-    jz __mar_comport_write_blocking_flush
-    jmp __mar_comport_write_blocking_loop
-__mar_comport_write_blocking_flush:
-    call __mar_comport_flush 
-;;    call __core_sleep
-    cmp A, 0
-    ;; TODO: rewrite the clearing of [__mar_comport_buffer_length], preferably flush with  pre_sleep hook and reset length with a post_sleep hook
-    jz __mar_comport_write_blocking_flush    ; if flushing failed, the flush call itself will adjust the length and buffer contents
-    mov [__mar_comport_buffer_length], 0     ; if the flushing did not fail
-    jmp __mar_comport_write_blocking_loop
-__mar_comport_write_blocking_flush_before_return:
-    cmp [__mar_comport_buffer_length], 0
-    jz __mar_comport_write_blocking_return
-    call __mar_comport_flush
-__mar_comport_write_blocking_return:
-    mov A, B
-    sub B, [BP + 3]
-    mov SP, BP
-    pop BP
-    pop B
-    ret 2
-
-;;; NOTE: the functions ABOVE abstract the direct hardware interface to implement basic functionality
-;;; NOTE: the functions BELOW give direct access to the hardware interface
-
-;; void __mar_comport_buffer_clear()
-;; clears the internal hardware message buffer
-;; NOTE: this is a different (unreachable) buffer than `__mar_comport_buffer`
-__mar_comport_buffer_clear:
-    ;; TODO: implement
-    ret
-
-;; size_t __mar_comport_poll(char * dest)
-;; 
-;; NOTE: this is an unsafe function because if dest is pointing to 40 reserved words it will overflow
-;; TODO: maybe write a safe version with a static 40 words buffer to write into, then write `size_t length` amount of characters to the destination
-__mar_comport_poll:
-    ;; TODO: implement
-    ret
-
 ;; bool __mar_comport_front_port_out(const char * source)
+;; copies 8 words from source to the object in front of the cubot if it has a com port
+;; returns a boolean stating success
 __mar_comport_front_port_out:
-    ;; TODO: implement
+    push B
+    push X
+    mov X, [SP + 3]
+    mov A, __MAR_COMPORT_FRONT_PORT_OUT
+    hwi __MAR_HWID_COMPORT
+    mov A, B
+    pop X
+    pop B
     ret
 
 ;; bool __mar_comport_self_out(const char * source)
+;; copies 8 words from source to the internal message buffer
+;; returns a boolean stating success
 __mar_comport_self_out:
-    ;; TODO: implement
+    push B
+    push X
+    mov X, [SP + 3]
+    mov A, __MAR_COMPORT_SELF_OUT
+    hwi __MAR_HWID_COMPORT
+    mov A, B
+    pop X
+    pop B
     ret
 
 ;; void __mar_comport_console_clear()
 ;; clears the console
 __mar_comport_console_clear:
-    ;; TODO: implement
+    mov A, __MAR_COMPORT_CONSOLE_CLEAR
+    hwi __MAR_HWID_COMPORT
     ret

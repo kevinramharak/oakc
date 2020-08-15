@@ -49,7 +49,7 @@ KEY_X     equ 0x58
 KEY_Y     equ 0x59
 KEY_Z     equ 0x5a
 
-;; void getch!()
+;; [#ffi] void getch!()
 ;; TODO: should use '../mar/keyboard'
 ;; retrieve a character from stdin and push it on the stack
 ;; NOTE: seems like getch is expected to block so we emulate that behaviour

@@ -14,8 +14,8 @@ __oak_prc:
     mov [__oak_prc_buffer], A
     push 1
     push __oak_prc_buffer
-    ; __mar_comport_write_blocking(loc, length)
-    call __mar_comport_write_blocking
+    ; __mar_comport_write(loc, length)
+    call __mar_comport_write
     mov SP, BP
     pop BP
     ret

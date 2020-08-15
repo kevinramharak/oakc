@@ -26,7 +26,7 @@ fn get_char() -> char { return getch!() as char; }
 
 // print number
 // NOTE: windows gets confused by the 'prn' in the name and tries to use it like a printer
-#[include("oak/_prn_.mar.ok")]
+#[include("oak/_prn.mar.ok")]
 
 // print character
 #[include("oak/prc.mar.ok")]

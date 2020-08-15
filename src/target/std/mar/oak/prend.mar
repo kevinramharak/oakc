@@ -10,7 +10,7 @@ prend:
 __oak_prend:
     push 1
     push __oak_prend_buffer
-    ; __mar_comport_write_blocking(loc, length)
-    call __mar_comport_write_blocking
+    ; __mar_comport_write(loc, length)
+    call __mar_comport_write
     ret
 __oak_prend_buffer: dw 0x000A

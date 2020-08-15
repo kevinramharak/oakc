@@ -14,22 +14,22 @@ org 0
 _0x0000:
     __core_interrupt_vector_table:
     ;; division by zero causes an interrupt
-    __core_interrupt_divide_by_zero: dw 0x0153
+    __core_interrupt_divide_by_zero: dw __core_interrupt_handler_default
 _0x0001:
     ;; not implemented
-    __core_interrupt_trap: dw 0x0153
+    __core_interrupt_trap: dw __core_interrupt_handler_default
 _0x0002:
     ;; not implemented
-    __core_interrupt_nmi: dw 0x0153
+    __core_interrupt_nmi: dw __core_interrupt_handler_default
 _0x0003:
     ;; NOTE: INT 3 is a special case for the server that starts the debugging mode.
     ;; NOTE: This memory location will never actually be used as a jump location for an interrupt
     ;; TODO: use this location for a static variable so we dont waste its space
     ;; not implemented server
-    __core_interrupt_break_point: dw 0x0153
+    __core_interrupt_break_point: dw __core_interrupt_handler_default
 _0x0004:
     ;; this interrupt requires a INTO instruction and the overflow flag to be set
-    __core_interrupt_integer_overflow: dw 0x0153
+    __core_interrupt_integer_overflow: dw __core_interrupt_handler_default
 _0x0005:
     ;; keep 0x05 - 0x1F reserved for future interrupt handlers
     dw 0x1B dup(0x0153)
@@ -37,7 +37,7 @@ _0x0020:
     ;; MAR server causes this interrupt when the cpu is not allowed to execute any more instructions
     ;; gives 10_0000 instructions to save state and brk.
     ;; If execution is forcibly stopped the behaviour of the runtime is undefined
-    __core_interrupt_execution_limit_reached: dw 0x0153
+    __core_interrupt_execution_limit_reached: dw __core_interrupt_handler_default
 _0x0021:
     ;; keep 0x20 - 0x3f reserverd for future (hardware) interrupt handlers
     __core_interrupt_vector_table_hardware: dw 0x001F dup(0x0153)
@@ -45,16 +45,16 @@ _0x0040:
     ;; keep 0x40 - 0x43 reserved for core interrupt handlers
     __core_interrupt_vector_table_core:
     ;; software interrupt for a panic of unkown reason
-    __core_interrupt_panic_unkown: dw 0x0153
+    __core_interrupt_panic_unkown: dw __core_interrupt_handler_default
 _0x0041:
     ;; software interrupt for a panic caused by a stack and heap collision
-    __core_interrupt_panic_stack_heap_collision: dw 0x0157
+    __core_interrupt_panic_stack_heap_collision: dw __core_interrupt_handler_panic_stack_heap_collision
 _0x0042:
     ;; software interrupt for a panic caused by having no more free memory
-    __core_interrupt_panic_no_free_memory: dw 0x015B
+    __core_interrupt_panic_no_free_memory: dw __core_interrupt_handler_panic_no_free_memory
 _0x0043:
     ;; software interrupt for a panic caused by a stack underflow
-    __core_interrupt_panic_stack_underflow: dw 0x015F
+    __core_interrupt_panic_stack_underflow: dw __core_interrupt_handler_panic_stack_underflow
     ;; 0x44 - 0x7f is open for software interrupts
 _0x0044:
     __core_interrupt_vector_table_software:
@@ -101,8 +101,6 @@ _0x0150:
 ;; defining this constant should allow stdlib or any other implementation to figure out if an entry in the ivt is used or not
 __CORE_INTERRUPT_HANDLER_DEFAULT equ 0x0153
 
-;; NOTE: at the moment we have to compute some of these interrupt addresses because the assembly cant use labels as a DW argument
-;; putting it right here after static data makes it easy to calculate the address
 _0x0153:
 ;; #[interrupt_handler] #[no_return] void __core_interrupt_handler_default()
 ;; this handler can be used as the default address for interrupt handlers
@@ -132,7 +130,7 @@ __core_interrupt_handler_panic_no_free_memory:
     push __CORE_STACK_HEAP_COLLISION
     call __core_panic
 _0x015F:
-;; #[interrupt_handler] #[no_return] void __core_interrupt_handler_panic_stack_underflowy()
+;; #[interrupt_handler] #[no_return] void __core_interrupt_handler_panic_stack_underflow()
 __core_interrupt_handler_panic_stack_underflow:
     push __CORE_STACK_UNDERFLOW
     call __core_panic
@@ -163,12 +161,12 @@ __core_panic_case_3:
 __core_panic_end:
     mov A, 3 ;; COMPORT_SELF_OUT
 __core_panic_write:
-    mov B, 0
     hwi 0x0D ;; HWID_COMPORT
+    mov B, 0 ;; reset b
 __core_panic_scan:
     inc X
     inc B
-    cmp [X], 0
+    cmp [X], 0 ;; this copies a null terminated string to the comport's internal buffer, then spins
     jz __core_spin
     cmp B, 9
     jz __core_panic_write
@@ -180,8 +178,8 @@ __core_panic_scan:
 __core_machine_new:
     ;; TODO: currently it uses compiler generated words and labels to intialize, those really should be compile time constants
     ;; TODO: write an heap implementation that doesnt have a 100% memory overhead
-    ;; compiler figures out how big the tape must be and defines it as `__core_vm_capacity: dw value`
-    mov [__core_vm_capacity], [__core_vm_capacity]
+    ;; compiler figures out how big the tape must be and defines it as `__core_init_vm_capacity: dw value`
+    mov [__core_vm_capacity], [__core_init_vm_capacity]
     ;; vm->memory is a pointer to the __core_heap_start address
     mov [__core_vm_memory], __core_heap_start
 
@@ -202,7 +200,6 @@ __core_machine_load_base_ptr:
 
 ;; void __core_machine_establish_stack_frame(size_t arg_size, size_t local_scope_size)
 __core_machine_establish_stack_frame:
-    int 3
     push BP
     mov BP, SP
     
@@ -259,7 +256,6 @@ __core_machine_establish_stack_frame_restore_args_return:
 
 ;; void __core_machine_end_stack_frame(size_t return_size, size_t local_scope_size);
 __core_machine_end_stack_frame:
-    int 3
     push BP
     mov BP, SP
     
@@ -618,6 +614,32 @@ __core_machine_divide:
     pop A
     ret
 
+;; TODO: should these be in core?
+;; #[internal] void __core_wrap_arg()
+;; should be called as a foreign function before calling another foreign function that does not use the vm to receive arguments
+;; assumes the argument is on top of the vm stack
+;; NOTE: each argument can only have a size of 1
+__core_wrap_arg:
+    int 3
+    ;; save return address
+    pop B
+    ;; retrieve oak value from the vm stack
+    call __core_machine_pop
+    ;; put in on the stack
+    push A
+    ;; put return address back on so we return to the caller
+    push B
+    ret
+
+;; #[internal] void __core_unwrap_return_value()
+;; should be called as a foreign function after calling another foreign function that does not use the vm to return a value
+;; assumes the return value is still in the A register so it pushes it on the vm stack
+;; NOTE: a return value can only have a size of 1
+__core_unwrap_return_value:
+    push A
+    call __core_machine_push
+    ret
+
 ;; execution on a server tick always starts at .text with the registers and status flags reset
 ;; a server reset erase the memory and floppy contents
 ;; #[entry] void __core_start()
@@ -633,9 +655,11 @@ __core_start:
     ;; call the user defined enry point
     call __core_main
 
-__core_spin:
     ;; set the __core_jump_on_wake pointer to the next instruction
+    ;; by using a simple pointer to represent a jump location if not null
+    ;; any implementation can use `__core_jump_on_wake` and `brk` to implement a sleep and wake implementation with more features
     mov [__core_jump_on_wake], __core_spin
+__core_spin:
     brk
 
 ;; the compiler will genererate the following

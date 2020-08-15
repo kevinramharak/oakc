@@ -1,5 +1,5 @@
 
-// we use the oak compiler itself to generate the actual std.mar file so we its compile time features
+// we use the oak compiler itself to generate the actual std.mar file so we can use its compile time features
 
 // these functions should mimic https://github.com/adam-mcdaniel/oakc/blob/master/src/std.ok
 // until a std lib specification is defined

@@ -658,8 +658,9 @@ __core_start:
     ;; set the __core_jump_on_wake pointer to the next instruction
     ;; by using a simple pointer to represent a jump location if not null
     ;; any implementation can use `__core_jump_on_wake` and `brk` to implement a sleep and wake implementation with more features
-    mov [__core_jump_on_wake], __core_spin
 __core_spin:
+    mov [__core_jump_on_wake], __core_brk
+__core_brk:
     brk
 
 ;; the compiler will genererate the following

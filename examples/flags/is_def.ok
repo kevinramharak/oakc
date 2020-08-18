@@ -1,32 +1,32 @@
 #[std]
-#[if(isdef("TEST_H")) {
+#[if(is_defined("TEST_H")) {
     fn test1() {
-        putstrln("isdef doesn't work :(");
+        putstrln("is_defined doesn't work :(");
     }
 } else {
     fn test1() {
-        putstrln("isdef works!");
+        putstrln("is_defined works!");
     }
 }]
 
-#[if(!isdef("TEST_H")) {
+#[if(!is_defined("TEST_H")) {
     const TEST_H = 1;
     fn test2() {
-        putstrln("isdef works!");
+        putstrln("is_defined works!");
     }
 } else {
     fn test2() {
-        putstrln("isdef doesn't work :(");
+        putstrln("is_defined doesn't work :(");
     }
 }]
 
-#[if(isdef("TEST_H")) {
+#[if(is_defined("TEST_H")) {
     fn test3() {
-        putstrln("isdef works!");
+        putstrln("is_defined works!");
     }
 } else {
     fn test3() {
-        putstrln("isdef doesn't work :(");
+        putstrln("is_defined doesn't work :(");
     }
 }]
 

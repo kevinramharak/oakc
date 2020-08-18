@@ -1,5 +1,5 @@
 
-#[if(!isdef("OAK_PREND")) {
+#[if(!is_defined("OAK_PREND")) {
     // include guard
     const OAK_PREND = 1;
     // include dependencies

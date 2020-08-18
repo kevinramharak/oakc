@@ -1,24 +1,6 @@
 
-#[if(!isdef("MAR_COMPORT")) {
+#[if(!is_defined("MAR_COMPORT")) {
     const MAR_COMPORT = 1;
 
     #[extern("comport.mar")]
-
-    type Comport(0) {
-        fn buffer_clear() {
-            __mar_comport_buffer_clear!();
-        }
-
-        fn poll(dest: &char, a: num) -> num {
-            __core_wrap_arg!(dest);
-            __mar_comport_poll!();
-            return __core_unwrap_return_value!() as num;
-        }
-
-        fn write(str: &char) -> bool {
-            __core_wrap_arg!(str);
-            __mar_comport_self_out!();
-            return __core_unwrap_return_value!() as bool;
-        }
-    }
 }]

@@ -1,5 +1,5 @@
 
-#[if(!isdef("C_STRING")) {
+#[if(!is_defined("C_STRING")) {
     // include guard
     const C_STRING = 1;
     // include dependencies

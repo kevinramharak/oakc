@@ -46,7 +46,7 @@ __mar_comport_write:
     mov a, __mar_comport_write_buffer
     add a, [__mar_comport_write_buffer_length]
     mov b, [bp + 3]
-
+    push [bp + 4]
 __mar_comport_write_loop:
     cmp [bp + 4], 0
     jz __mar_comport_write_return
@@ -59,7 +59,8 @@ __mar_comport_write_loop:
     dec [bp + 4]
     jmp __mar_comport_write_loop
 __mar_comport_write_return:
-    mov a, [bp + 4]
+    pop a
+    sub a, [bp + 4]
     mov sp, bp
     pop bp
     pop b
@@ -79,13 +80,15 @@ __mar_comport_flush:
     ;; keep flushing until we get a false or if we are at the end of the buffer
 __mar_comport_flush_loop:
     cmp [__mar_comport_write_buffer_length], 0
-    jle __mar_comport_flush_shift
+    jle __mar_comport_flush_clear_length
     hwi __MAR_HWID_COMPORT
     cmp b, 0
     jz __mar_comport_flush_shift
     add x, 8
     sub [__mar_comport_write_buffer_length], 8
     jmp __mar_comport_flush_loop
+__mar_comport_flush_clear_length:
+    mov [__mar_comport_write_buffer_length], 0 ;; it might have underflowed into some FFFx value, just reset it to 0
 __mar_comport_flush_shift:
     mov b, __mar_comport_write_buffer
     push x ;; save this to calculate the amount of characters flushed later

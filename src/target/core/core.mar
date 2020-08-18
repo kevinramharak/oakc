@@ -39,7 +39,7 @@ _0x0020:
     ;; MAR server causes this interrupt when the cpu is not allowed to execute any more instructions
     ;; gives 10_0000 instructions to save state and brk.
     ;; If execution is forcibly stopped the behaviour of the runtime is undefined
-    __core_interrupt_execution_limit_reached: dw __core_interrupt_handler_default
+    __core_interrupt_execution_limit_reached: dw __core_interrupt_handler_execution_limit_reached
 _0x0021:
     ;; keep 0x20 - 0x3f reserverd for future (hardware) interrupt handlers
     __core_interrupt_vector_table_hardware: dw 0x001F dup(0x0153)
@@ -73,8 +73,8 @@ _0x0080:
     __core_initializer_vector_table_entries: dw __core_machine_new
     ;; }
     ;; unused padding (0xdead is a value that is easily recognized)
-    dw 0x78 dup(0xdead)
-_0x00FA:
+    dw 0x76 dup(0xdead)
+_0x00F8:
     ;; static variables used by __core_* functions
     ;; static struct machine {
     __core_vm:
@@ -99,6 +99,10 @@ _0x00FA:
     __core_panic_stack_underflow: dw "\nERR_STACK_UNDERFLOW", 0 ;; 21 length
     ;; static void * __core_jump_on_wake
     __core_jump_on_wake: dw 0x0000 ;; 0 represents no jump, non-0 represent a jump location
+    ;; static size_t __core_execution_limit_reached_saved_sp
+    __core_execution_limit_reached_saved_sp: dw 0
+    ;; static size_t __core_execution_limit_reached_saved_bp
+    __core_execution_limit_reached_saved_bp: dw 0
 _0x0150:
     ;; 3 words reserved for execution cost variables. These are set by the server executing the code
     ;; see https://github.com/simon987/Much-Assembly-Required/blob/master/Server/src/main/java/net/simon987/server/assembly/CPU.java#L194
@@ -119,7 +123,7 @@ __core_interrupt_handler_default:
 __core_interrupt_handler_panic_unkown:
     push 0
     call __core_panic
-
+    
 __CORE_STACK_HEAP_COLLISION EQU 1
 __CORE_NO_FREE_MEMORY EQU 2
 __CORE_STACK_UNDERFLOW EQU 3
@@ -140,6 +144,32 @@ __core_interrupt_handler_panic_stack_underflow:
     push __CORE_STACK_UNDERFLOW
     call __core_panic
 _0x0163:
+
+;; #[interrupt_handler] void __core_interrupt_handler_execution_limit_reached()
+;; this has to be in core to make sure a program keeps its execution state in between ticks
+;; std can overwrite the interupt vector entry to a different location to add more features (like a __mar_comport_flush call)
+__core_interrupt_handler_execution_limit_reached:
+    push a
+    push b
+    push c
+    push d
+    push x
+    push y
+    mov [__core_execution_limit_reached_saved_sp], sp
+    mov [__core_execution_limit_reached_saved_bp], bp
+    mov [__core_jump_on_wake], __core_interrupt_handler_execution_limit_reached_on_wake
+    call __mar_comport_flush ;; TODO: remove this from core
+    brk
+__core_interrupt_handler_execution_limit_reached_on_wake:
+    mov bp, [__core_execution_limit_reached_saved_bp]
+    mov sp, [__core_execution_limit_reached_saved_sp]
+    pop y
+    pop x
+    pop d
+    pop c
+    pop b
+    pop a
+    iret
 
 ;; #[no_return] void __core_panic(int error_code)
 ;; prints a user friendly error message and then exits the program
@@ -173,7 +203,7 @@ __core_panic_scan:
     inc B
     cmp [X], 0 ;; this copies a null terminated string to the comport's internal buffer, then spins
     jz __core_spin
-    cmp B, 9
+    cmp B, 8
     jz __core_panic_write
     jmp __core_panic_scan
 
@@ -213,23 +243,21 @@ __core_machine_establish_stack_frame:
     ;; [BP + 2] == size_t arg_size
     ;; [BP + 3] == size_t local_scope_size
 
-    ;; reserve space on the stack for the function arguments
-    mov X, SP
-    sub SP, [BP + 2]
     ; int args[arg_size]
     ; int * ptr = args[args.length - 1]
 
-    ;; Pop the arguments' values off of the stack
+    ;; Pop the arguments' values off of the vm stack onto the mar stack
     ; while (ptr != args) {
     ;   *ptr = machine_pop();
     ;    ptr -= 1;
     ; }
+    mov x, [BP + 2]
 __core_machine_establish_stack_frame_preserve_args_loop:
-    cmp X, SP
+    cmp x, 0
     jz __core_machine_establish_stack_frame_preserve_args_break
     call __core_machine_pop
-    mov [X], A
-    dec X
+    push a
+    dec x
     jmp __core_machine_establish_stack_frame_preserve_args_loop
 __core_machine_establish_stack_frame_preserve_args_break:
 
@@ -246,7 +274,7 @@ __core_machine_establish_stack_frame_preserve_args_break:
     ;; NOTE: the vm impl in C actually pushes 0's
     add [__core_vm_stack_ptr], [BP + 3]
 
-    ;; Push the arguments back onto the stack for use by the current function
+    ;; Push the arguments back onto the vm stack from the mar stack
 __core_machine_establish_stack_frame_restore_args_loop:
     cmp [BP + 2], 0
     jz __core_machine_establish_stack_frame_restore_args_return
@@ -269,9 +297,6 @@ __core_machine_end_stack_frame:
     ;; [BP + 2] == size_t return_size
     ;; [BP + 3] == size_t local_scope_size
 
-    ;; reserve space on the stack for the return value
-    mov X, SP
-    sub SP, [BP + 2]
     ; int return_value[return_size]
     ; int * ptr = return_value[return_value.length - 1]
 
@@ -280,12 +305,13 @@ __core_machine_end_stack_frame:
     ;   *ptr = machine_pop();
     ;    ptr -= 1;
     ; }
+    mov x, [BP + 2]
 __core_machine_establish_stack_frame_preserve_return_value_loop:
-    cmp X, SP
+    cmp x, 0
     jz __core_machine_establish_stack_frame_preserve_return_value_clear_stack
     call __core_machine_pop
-    mov [X], A
-    dec X
+    push a
+    dec x
     jmp __core_machine_establish_stack_frame_preserve_return_value_loop
 
 __core_machine_establish_stack_frame_preserve_return_value_clear_stack:
@@ -369,8 +395,7 @@ __core_machine_allocate_return:
     pop A
     ret
 __core_machine_allocate_loop_panic:
-    push __CORE_NO_FREE_MEMORY
-    call __core_panic
+    int __core_interrupt_panic_no_free_memory
 
 ;; void __core_machine_free()
 __core_machine_free:
@@ -426,8 +451,7 @@ __core_machine_push:
     pop A
     ret 1
 __core_machine_push_panic:
-    push __CORE_STACK_HEAP_COLLISION
-    call __core_panic
+    int __core_interrupt_panic_stack_heap_collision
 
 ;; int __core_machine_pop()
 ;; pop n of the stack
@@ -449,8 +473,7 @@ __core_machine_pop:
     pop B
     ret
 __core_machine_pop_panic:
-    push __CORE_STACK_UNDERFLOW
-    call __core_panic
+    int __core_interrupt_panic_stack_underflow
 
 ;; void __core_machine_store(int size)
 ;; pop address of the stack

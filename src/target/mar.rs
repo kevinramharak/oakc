@@ -104,7 +104,8 @@ __core_main:
     fn end_entry_point(&self) -> String {
         // technically we want to get the return value from main and return it to the hosting environment
         // but since the target implementation is the host, we can do whatever we want here
-        String::from("    RET ;; return from entry point\n")
+        // TODO: remove the call to __mar_comport_flush from core
+        String::from("    call __mar_comport_flush\n    RET ;; return from entry point\n")
     }
 
     fn establish_stack_frame(&self, arg_size: i32, local_scope_size: i32) -> String {

@@ -13,7 +13,7 @@ __oak_prs:
     ;; preserve B
     push B
     mov B, [__core_vm_memory]     ; char * loc = vm->memory
-    call __core_machine_pop            ; size_t offset = __core_memory_pop()
+    call __core_machine_pop            ; size_t offset = __core_machine_pop()
     add B, A                    ; loc += offset
     push B
     call __c_strlen             ; size_t length = strlen(loc)

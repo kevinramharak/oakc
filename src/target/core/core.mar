@@ -1,12 +1,14 @@
-;; TODO: being forced to generate this in a fixed order is annoying and removes modularity. Keep in check with any multi file features for MAR
+;; NOTE: the compiler will hoist __CORE_GLOBAL_SCOPE_SIZE and __CORE_INIT_VM_CAPACITY as a prefix to the contents of this file
 
 ;; we want the runtime to be be able to host 'itself' by not depending on any dependencies
 ;; it should only implement the vm and any nessesary code and variables to run the oak program
+;; the only overhead it currently contains is having a function pointer table for initializer functions
+;; core only uses 1 entry, the rest of the entries can be filled during a 'linking' process to hook into this initializer feature
 
 ;; Setting the binary offset to 0 makes sure our .data section starts at address 0x0000
 org 0
 
-;; data segment - for now assumed that .data starts at adress 0x00
+;; data segment -
 ;; NOTE: the _0x00xx labels are just to help visualize the offsets
 ;; TODO: do not leak these labels
 ;; NOTE: there are some static variables scattered trough the source, decide on what stays static inline and what can move to the data section
@@ -62,10 +64,16 @@ _0x0044:
     ;; TODO: figure out how the stdlib is going to reserve interrupts
     ;; probably by owning the software interrupt table and providing an interface to interact with it
 _0x0080:
-    ;; padding
-    ;; this padding can be used for core static variables / data
-    dw 0x7A dup(0xdead)
-    ;; padding
+    __core_initializer_vector_table:
+    ;; NOTE: when altering the table, the padding after the struct has to be adjusted as well.
+    ;; struct __core_initializer_vector_table {
+    ;;   size_t length
+    __core_initializer_vector_table_length: dw 1
+    ;;   void * entries
+    __core_initializer_vector_table_entries: dw __core_machine_new
+    ;; }
+    ;; unused padding (0xdead is a value that is easily recognized)
+    dw 0x78 dup(0xdead)
 _0x00FA:
     ;; static variables used by __core_* functions
     ;; static struct machine {
@@ -74,11 +82,11 @@ _0x00FA:
     __core_vm_memory: dw 0x0000
     ;;   bool * allocated
     __core_vm_allocated: dw 0x0000
-    ;;   int capacity
+    ;;   size_t capacity
     __core_vm_capacity: dw 0x0000
-    ;;   int base_ptr
+    ;;   size_t base_ptr
     __core_vm_base_ptr: dw 0x0000
-    ;;   int stack_ptr
+    ;;   size_t stack_ptr
     __core_vm_stack_ptr: dw 0x0000
     ;; } vm;
     ;; static const char * __core_panic_unkown_message
@@ -97,9 +105,6 @@ _0x0150:
     __core_execution_cost_addr: dw 0x0000
     ;; 32 bit signed integer
     __core_executed_instruction_count: dw 0x0000, 0x0000
-
-;; defining this constant should allow stdlib or any other implementation to figure out if an entry in the ivt is used or not
-__CORE_INTERRUPT_HANDLER_DEFAULT equ 0x0153
 
 _0x0153:
 ;; #[interrupt_handler] #[no_return] void __core_interrupt_handler_default()
@@ -162,7 +167,7 @@ __core_panic_end:
     mov A, 3 ;; COMPORT_SELF_OUT
 __core_panic_write:
     hwi 0x0D ;; HWID_COMPORT
-    mov B, 0 ;; reset b
+    xor B, B ;; reset b
 __core_panic_scan:
     inc X
     inc B
@@ -173,13 +178,13 @@ __core_panic_scan:
     jmp __core_panic_scan
 
 ;; void __core_machine_new()
-;; intializes the virtual machine located at the label __core_vm
+;; initializes the virtual machine located at the label __core_vm
 ;; we expected a label to be at the end of all code named `__core_heap_start`
 __core_machine_new:
-    ;; TODO: currently it uses compiler generated words and labels to intialize, those really should be compile time constants
+    ;; TODO: currently it uses compiler generated words and labels to initialize, those really should be compile time constants
     ;; TODO: write an heap implementation that doesnt have a 100% memory overhead
     ;; compiler figures out how big the tape must be and defines it as `__core_init_vm_capacity: dw value`
-    mov [__core_vm_capacity], [__core_init_vm_capacity]
+    mov [__core_vm_capacity], __CORE_INIT_VM_CAPACITY
     ;; vm->memory is a pointer to the __core_heap_start address
     mov [__core_vm_memory], __core_heap_start
 
@@ -188,7 +193,7 @@ __core_machine_new:
     add [__core_vm_allocated], [__core_vm_capacity]
     ;; compiler figures out how big the stack can be and defines it as `__core_global_scope_size: dw value`
     ;; the c impl does a for loop with push(0) for this size, but the end result is the same as setting the stack ptr to this size
-    mov [__core_vm_stack_ptr], [__core_global_scope_size]
+    mov [__core_vm_stack_ptr], __CORE_GLOBAL_SCOPE_SIZE
     ret
 
 ;; void __core_machine_load_base_ptr()
@@ -321,7 +326,7 @@ __core_machine_allocate:
     mov B, [__core_vm_capacity]  ; int i = vm->capacity
     dec B                      ; i -= 1
     mov C, [__core_vm_allocated] ; int * loc_allocated = vm->allocated
-    mov X, 0                   ; int consecutive_free_cells = 0
+    xor X, X                   ; int consecutive_free_cells = 0
 __core_machine_allocate_loop_find:
     cmp B, [__core_vm_stack_ptr] ; while (i > vm->stack_ptr)
     jle __core_machine_allocate_loop_break
@@ -332,7 +337,7 @@ __core_machine_allocate_loop_find:
     inc X
     jmp __core_machine_allocate_loop_find_true
 __core_machine_allocate_loop_find_false:
-    mov X, 0
+    xor X, X
 __core_machine_allocate_loop_find_true:
     cmp X, A                   ; if consecutive_free_cells == size
     jz __core_machine_allocate_loop_break
@@ -342,7 +347,7 @@ __core_machine_allocate_loop_break:
     mov Y, B                   ; int addr = i
     cmp Y, [__core_vm_stack_ptr] ; if addr <= vm->stack_ptr then panic
     jle __core_machine_allocate_loop_panic
-    mov B, 0                   ; i = 0
+    xor B, B                   ; i = 0
 __core_machine_allocate_loop_mark:
     cmp B, A                   ; while (i < size)
     jge __core_machine_allocate_return
@@ -378,7 +383,7 @@ __core_machine_free:
     call __core_machine_pop         ; int addr = __core_machine_pop() // C
     mov C, A
     call __core_machine_pop         ; int size = __core_machine_pop() // A
-    mov B, 0                 ; int i = 0                // B
+    xor B, B                 ; int i = 0                // B
 __core_machine_free_loop:
     cmp B, A
     jl __core_machine_free_return
@@ -495,7 +500,7 @@ __core_machine_load:
     call __core_machine_pop        ; int * addr = __core_machine_pop()
     add A, [__core_vm_memory] ; addr += vm->memory
     mov C, A                ; move addr to a different register
-    mov B, 0                ; int i = 0
+    xor B, B                ; int i = 0
 __core_machine_load_loop:
     cmp B, [BP + 6]         ; while (i < size)
     jge __core_machine_load_return
@@ -601,7 +606,7 @@ __core_machine_divide:
     push B
     push BP
     mov BP, SP
-    mov Y, 0
+    xor Y, Y
     call __core_machine_pop
     mov B, A
     call __core_machine_pop
@@ -649,21 +654,30 @@ __core_start:
     cmp [__core_jump_on_wake], 0
     jnz [__core_jump_on_wake]
 
-    ;; initialize the oak virtual machine
-    call __core_machine_new
+    ;; setup a loop to call all intializer functions
+__core_start_initialize_runtime:
+    xor a, a                                          ; size_t i = 0
+__core_start_initialize_runtime_loop:
+    cmp a, [__core_initializer_vector_table_length]   ; while (i != __core_initializer_vector_table_length)
+    jz __core_start_runtime_is_initialized
+    mov b, __core_initializer_vector_table_entries    ; void (*func)() = __core_initializer_vector_table_entries[i]
+    add b, a
+    call [b]                                            ; (*func)()
+    inc a                                             ; i++
+    jmp __core_start_initialize_runtime_loop
 
+__core_start_runtime_is_initialized:
     ;; call the user defined enry point
     call __core_main
 
     ;; set the __core_jump_on_wake pointer to the next instruction
     ;; by using a simple pointer to represent a jump location if not null
     ;; any implementation can use `__core_jump_on_wake` and `brk` to implement a sleep and wake implementation with more features
-    mov [__core_jump_on_wake], __core_spin
 __core_spin:
+    mov [__core_jump_on_wake], __core_brk
+__core_brk:
     brk
 
-;; the compiler will genererate the following
-;; constants are not hoisted so we have to waste size to this
-;; __core_global_scope_size: DW $ ;; amount of global variables
-;; __core_vm_capacity: DW $       ;; capacity the vm should be initialized with
-;; __core_main: ...               ;; oak program entrypoint. after the runtime is initialized it will call this function
+;; the compiler will genererate the following:
+;; oak program entrypoint. after the runtime is initialized it will call this function
+;; __core_main:

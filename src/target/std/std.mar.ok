@@ -19,17 +19,17 @@ fn get_char() -> char { return getch!() as char; }
 */
 
 // print null terminated string
-#[include("oak/prs.mar.ok")]
+#[include("mar/oak/prs.mar.ok")]
 
 // print line ending
-#[include("oak/prend.mar.ok")]
+#[include("mar/oak/prend.mar.ok")]
 
 // print number
 // NOTE: windows gets confused by the 'prn' in the name and tries to use it like a printer
-#[include("oak/_prn.mar.ok")]
+#[include("mar/oak/_prn.mar.ok")]
 
 // print character
-#[include("oak/prc.mar.ok")]
+#[include("mar/oak/prc.mar.ok")]
 
 // get a character from stdin (assume blocking execution until we have one)
-#[include("oak/getch.mar.ok")]
+#[include("mar/oak/getch.mar.ok")]

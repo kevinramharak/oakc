@@ -4,80 +4,59 @@ use std::{
     fs::{remove_file, write, read_to_string},
     fmt::{Debug, Display},
     io::{Error, ErrorKind, Result, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     convert::TryFrom,
     collections::BTreeMap,
     process::exit,
+    cell::{Cell, RefCell},
 };
 
+use pathdiff::diff_paths;
 use asciicolor::Colorize;
-use crate::{parse,asm::AsmError};
+use crate::{parse,asm::AsmStatement, hir::{HirProgram, HirDeclaration}};
 
-// TODO: we want to compile to mir and then add that to the current compilation object
-fn generate_stdlib(cwd: &PathBuf, input: String, target: &impl Target) -> Result<String> {
-    let mut hir = parse(input);
+pub struct MAR {
+    global_scope_size: Cell<u16>,
+    init_vm_capacity: Cell<u16>,
+    unique_id: Cell<u16>,
+    loop_identifiers: RefCell<Vec<u16>>,
+}
 
-    match hir.compile(cwd, target, &mut BTreeMap::new()) {
-        Ok(mir) => match mir.assemble() {
-            Ok(asm) => {
-                // Set up the output code
-                let mut result = String::new();
-        
-                // Iterate over the external files to include
-                for filename in asm.get_externs() {
-                    // Find them in the current working directory
-                    if let Ok(contents) = read_to_string(filename.clone()) {
-                        // Add the contents of the file to the result
-                        result += &contents
-                    } else {
-                        // If the file doesn't exist, throw an error
-                        if let Ok(name) = filename.clone().into_os_string().into_string() {
-                            eprintln!("compilation error while generating 'std.mar': {}", format!("could not find foreign file '{}'", name).bright_red().underline());
-                        } else {
-                            eprintln!("compilation error while generating 'std.mar': {}", String::from("could not find foreign file").bright_red().underline());
-                        }
-                        exit(1);
-                    }
-                }
-
-                return Ok(result);
-            },
-            Err(e) => {
-                eprintln!("compilation error while generating 'std.mar': {}", e.bright_red().underline());
-                exit(1);
-            }
-        }
-        Err(e) => {
-            eprintln!("compilation error while generating 'std.mar': {}", e.bright_red().underline());
-            exit(1);
+impl Default for MAR {
+    fn default() -> Self {
+        MAR { 
+            global_scope_size: Cell::new(0),
+            init_vm_capacity: Cell::new(0),
+            unique_id: Cell::new(0),
+            loop_identifiers: RefCell::new(Vec::new()),
         }
     }
 }
-
-pub struct MAR;
-
-// TODO: so these should be Cell<T> members of the MAR struct
-// but that would require MAR to be mutable for the Target impl
-// thus requirering the other target implementations to also update their function signatures to &mut self
-static mut saved_global_scope_size: u16 = 0;
-static mut saved_init_vm_capacity: u16 = 0;
-static mut unique_id: i32 = 0;
-static mut loop_identifiers: Vec<i32> = Vec::new(); 
-
 
 impl Target for MAR {
     fn get_name(&self) -> char {
         'm'
     }
 
-    fn std(&self) -> String {
-        // we use the oak compiler itself to compile our stdlib
-        // we kinda have to because MAR has no import system or compile time checks available
-        // pathbuff from project root working directory?
-        if let Ok(std) = generate_stdlib(&PathBuf::from("src/target/std/mar/"), String::from(include_str!("std/std.mar.ok")), self) {
-            return std;
+    // we made a hook into the hir program so we can include our 'std.mar.ok' file as if it were an include statement
+    // this allows us to use the oak compile time features to generate the mar stdlib
+    fn extend_hir(&self, cwd: &PathBuf, hir: &mut HirProgram) {
+        if hir.use_std() {
+            let cwd_path = cwd.canonicalize().unwrap();
+            let file = file!();
+            let mut path = PathBuf::from(file);
+            path.pop();
+            path.push("std");
+            path.push("std.mar.ok");
+            path = path.canonicalize().unwrap();
+            let diff = diff_paths(&path, &cwd_path).unwrap();
+            let mut decls = vec!(HirDeclaration::Include(String::from(diff.to_str().unwrap())));
+            hir.extend_declarations(&decls);
         }
-        String::from(";; ERROR: could not generate the 'std.mar' file")
+    }
+
+    fn std(&self) -> String {
+        String::new()
     }
 
     fn core_prelude(&self) -> String {
@@ -91,10 +70,8 @@ impl Target for MAR {
     fn begin_entry_point(&self, global_scope_size: i32, memory_size: i32) -> String {
         // because of how constants need to be manually hoisted in MAR assembly
         // we save these values and prefix them to the code in the compile function
-        unsafe {
-            saved_global_scope_size = u16::try_from(global_scope_size).ok().unwrap();
-            saved_init_vm_capacity = u16::try_from(memory_size).ok().unwrap();
-        }
+        self.global_scope_size.set(u16::try_from(global_scope_size).ok().unwrap());
+        self.init_vm_capacity.set(u16::try_from(memory_size).ok().unwrap());
         String::from(format!(r##"
 ;; start of entry point
 __core_main:
@@ -198,29 +175,23 @@ r##"    push {} ;; size
     }
 
     fn begin_while(&self) -> String {
-        unsafe {
-            let id = unique_id;
-            loop_identifiers.push(id);
-            unique_id += 1;
-            let str = String::from(format!(
+        let id = self.unique_id.get();
+        self.unique_id.set(id + 1);
+        self.loop_identifiers.borrow_mut().push(id);
+        String::from(format!(
 r#"__generated_begin_while_{}:
     call __core_machine_pop
     cmp A, 0
     jz __generated_end_while_{}
-"#, id, id));
-            str
-        }
+"#, id, id))
     }
 
     fn end_while(&self) -> String {
-        unsafe {
-            let id = loop_identifiers.pop().unwrap();
-            let str = String::from(format!(
+        let id = self.loop_identifiers.borrow_mut().pop().unwrap();
+        String::from(format!(
 r#"    jmp __generated_begin_while_{}
 __generated_end_while_{}:
-"#, id, id));
-            str
-        }
+"#, id, id))
     }
 
     fn compile(&self, code: String) -> Result<()> {
@@ -229,7 +200,7 @@ __generated_end_while_{}:
 r#"
 __CORE_GLOBAL_SCOPE_SIZE equ {}
 __CORE_INIT_VM_CAPACITY equ {}
-"#, unsafe { saved_global_scope_size }, unsafe { saved_init_vm_capacity })) + code.as_str();
+"#, self.global_scope_size.get(), self.init_vm_capacity.get())) + code.as_str();
         if let Ok(_) = write("OUTPUT.mar", code_with_prefixed_constants) {
             return Result::Ok(())
         }

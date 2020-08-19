@@ -7,8 +7,13 @@ pub use mar::MAR;
 mod ts;
 pub use ts::TS;
 
+use std::{collections::BTreeMap, path::PathBuf};
+use super::hir::{HirConstant, HirProgram};
+
 pub trait Target {
     fn get_name(&self) -> char;
+
+    fn extend_hir(&self, cwd: &PathBuf, hir: &mut HirProgram) {}
 
     fn std(&self) -> String;
     fn core_prelude(&self) -> String;

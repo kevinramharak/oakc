@@ -52,7 +52,7 @@ fn main() {
                 } else if matches.is_present("ts") {
                     compile(&cwd, contents, TS)
                 } else if matches.is_present("mar") {
-                    compile(&cwd, contents, MAR)
+                    compile(&cwd, contents, MAR::default())
                  } else {
                     compile(&cwd, contents, C)
                 };

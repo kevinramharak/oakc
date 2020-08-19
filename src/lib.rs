@@ -31,8 +31,10 @@ pub fn compile(cwd: &PathBuf, input: impl ToString, target: impl Target) -> Resu
     let mut hir = parse(input);
     hir.extend_declarations(parse(include_str!("core.ok")).get_declarations());
     if hir.use_std() {
-        hir.extend_declarations(parse(include_str!("std.ok")).get_declarations())
+        hir.extend_declarations(parse(include_str!("std.ok")).get_declarations());
     }
+
+    target.extend_hir(&cwd, &mut hir);
 
     match hir.compile(cwd, &target, &mut BTreeMap::new()) {
         Ok(mir) => match mir.assemble() {

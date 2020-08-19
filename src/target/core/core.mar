@@ -222,117 +222,6 @@ __core_machine_new:
     mov [__core_vm_stack_ptr], __CORE_GLOBAL_SCOPE_SIZE
     ret
 
-;; void __core_machine_load_base_ptr()
-;; push the base pointer onto the stack
-__core_machine_load_base_ptr:
-    push [__core_vm_base_ptr]
-    call __core_machine_push
-    ret
-
-;; void __core_machine_establish_stack_frame(size_t arg_size, size_t local_scope_size)
-__core_machine_establish_stack_frame:
-    push BP
-    mov BP, SP
-    
-    ;; [BP] == BP
-    ;; [BP + 1] == return address
-    ;; [BP + 2] == size_t arg_size
-    ;; [BP + 3] == size_t local_scope_size
-
-    ; int args[arg_size]
-    ; int * ptr = args[args.length - 1]
-
-    ;; Pop the arguments' values off of the vm stack onto the mar stack
-    ; while (ptr != args) {
-    ;   *ptr = machine_pop();
-    ;    ptr -= 1;
-    ; }
-    mov x, [BP + 2]
-__core_machine_establish_stack_frame_preserve_args_loop:
-    cmp x, 0
-    jz __core_machine_establish_stack_frame_preserve_args_break
-    call __core_machine_pop
-    push a
-    dec x
-    jmp __core_machine_establish_stack_frame_preserve_args_loop
-__core_machine_establish_stack_frame_preserve_args_break:
-
-    ;; Push the current base pointer onto the stack so that
-    ;; when this function returns, it will be able to resume
-    ;; the current stack frame
-    call __core_machine_load_base_ptr
-
-    ;; Set the base pointer to the current stack pointer to 
-    ;; begin the stack frame at the current position on the stack.
-    mov [__core_vm_base_ptr], [__core_vm_stack_ptr]
-
-    ;; allocate space for local variables
-    ;; NOTE: the vm impl in C actually pushes 0's
-    add [__core_vm_stack_ptr], [BP + 3]
-
-    ;; Push the arguments back onto the vm stack from the mar stack
-__core_machine_establish_stack_frame_restore_args_loop:
-    cmp [BP + 2], 0
-    jz __core_machine_establish_stack_frame_restore_args_return
-    call __core_machine_push
-    dec [BP + 2]
-    jmp __core_machine_establish_stack_frame_restore_args_loop
-
-__core_machine_establish_stack_frame_restore_args_return:
-    mov SP, BP
-    pop BP
-    ret 2
-
-;; void __core_machine_end_stack_frame(size_t return_size, size_t local_scope_size);
-__core_machine_end_stack_frame:
-    push BP
-    mov BP, SP
-    
-    ;; [BP] == BP
-    ;; [BP + 1] == return address
-    ;; [BP + 2] == size_t return_size
-    ;; [BP + 3] == size_t local_scope_size
-
-    ; int return_value[return_size]
-    ; int * ptr = return_value[return_value.length - 1]
-
-    ;; Pop the returned values off of the stack
-    ; while (ptr != return_value) {
-    ;   *ptr = machine_pop();
-    ;    ptr -= 1;
-    ; }
-    mov x, [BP + 2]
-__core_machine_establish_stack_frame_preserve_return_value_loop:
-    cmp x, 0
-    jz __core_machine_establish_stack_frame_preserve_return_value_clear_stack
-    call __core_machine_pop
-    push a
-    dec x
-    jmp __core_machine_establish_stack_frame_preserve_return_value_loop
-
-__core_machine_establish_stack_frame_preserve_return_value_clear_stack:
-    ;; Discard the memory setup by the stack frame
-    ;; NOTE: the c impl actually pops these (and pop 0's out the memory)
-    sub [__core_vm_stack_ptr], [BP + 3]
-
-    ;; Retrieve the parent function's base pointer to resume the function
-    call __core_machine_pop
-    mov [__core_vm_base_ptr], A
-    
-    ;; Finally, push the returned value back onto the stack for use by
-    ;; the parent function.
-__core_machine_establish_stack_frame_restore_return_value_loop:
-    cmp [BP + 2], 0
-    jz __core_machine_establish_stack_frame_restore_return_value_return
-    call __core_machine_push
-    DEC [BP + 2]
-    jmp __core_machine_establish_stack_frame_restore_return_value_loop
-
-__core_machine_establish_stack_frame_restore_return_value_return:
-    mov SP, BP
-    pop BP
-    ret 2
-
 ;; void __core_machine_allocate()
 ;; pop size of the stack
 __core_machine_allocate:
@@ -344,7 +233,8 @@ __core_machine_allocate:
     push Y
     push BP
     mov BP, SP
-    call __core_machine_pop      ; int size = __core_machine_pop()
+    mov a, 0
+    ;; call __core_machine_pop
     mov B, [__core_vm_capacity]  ; int i = vm->capacity
     dec B                        ; i -= 1
     mov C, [__core_vm_allocated] ; int * loc_allocated = vm->allocated
@@ -383,7 +273,6 @@ __core_machine_allocate_loop_mark:
     jmp __core_machine_allocate_loop_mark
 __core_machine_allocate_return:
     push Y
-    call __core_machine_push
     mov SP, BP
     pop BP
     pop Y
@@ -404,9 +293,11 @@ __core_machine_free:
     push X
     push BP
     mov BP, SP
-    call __core_machine_pop         ; int addr = __core_machine_pop() // C
+    mov a, 0
+    ;;call __core_machine_pop         ; int addr = __core_machine_pop() // C
     mov C, A
-    call __core_machine_pop         ; int size = __core_machine_pop() // A
+    mov a, 0
+    ;;call __core_machine_pop         ; int size = __core_machine_pop() // A
     xor B, B                 ; int i = 0                // B
 __core_machine_free_loop:
     cmp B, A
@@ -428,217 +319,6 @@ __core_machine_free_return:
     pop D
     pop C
     pop B
-    ret
-
-;; void __core_machine_push(int n)
-;; push n to the stack
-__core_machine_push:
-    push A
-    push BP
-    mov BP, SP
-    ;; if vm->allocated[vm->stack_ptr] !== 0 then panic
-    mov A, [__core_vm_allocated]
-    add A, [__core_vm_stack_ptr]
-    cmp [A], 0
-    jnz __core_machine_push_panic
-    mov A, [__core_vm_memory]
-    add A, [__core_vm_stack_ptr] ; ref = &vm->memory[vm->stack_ptr]
-    mov [A], [BP + 3]          ; *ref = n
-    inc [__core_vm_stack_ptr]    ; vm->stack_ptr++
-    mov SP, BP
-    pop BP
-    pop A
-    ret 1
-__core_machine_push_panic:
-    int __core_interrupt_panic_stack_heap_collision
-
-;; int __core_machine_pop()
-;; pop n of the stack
-__core_machine_pop:
-    push B
-    push BP
-    mov BP, SP
-    cmp [__core_vm_stack_ptr], 0
-    jz __core_machine_pop_panic
-    mov A, [__core_vm_memory]    ; int * loc = vm->memory
-    add A, [__core_vm_stack_ptr] ; loc += vm->stack_ptr
-    dec A                      ; loc -= 1
-    mov B, [A]                 ; int b = *loc
-    mov [A], 0                 ; *loc = 0 // do we really need to 0 it?
-    dec [__core_vm_stack_ptr]    ; vm->stack_ptr--
-    mov A, B                   ; return values are set in the A register
-    mov SP, BP
-    pop BP
-    pop B
-    ret
-__core_machine_pop_panic:
-    int __core_interrupt_panic_stack_underflow
-
-;; void __core_machine_store(int size)
-;; pop address of the stack
-;; i is size - 1
-;; for i until size
-;;    pop value off the stack
-;;    write it to address + i
-__core_machine_store:
-    push A
-    push B
-    push C
-    push D
-    push BP
-    mov BP, SP
-    call __core_machine_pop        ; int * addr = __core_machine_pop()
-    add A, [__core_vm_memory] ; addr += vm->memory
-    mov C, A                ; // move addr to a different register
-    mov B, [BP + 6]         ; int i = size
-    dec B                   ; i -= 1
-__core_machine_store_loop:
-    cmp B, 0                ;   while (i >= 0)
-    jl __core_machine_store_return
-    call __core_machine_pop        ;   int value = __core_machine_pop()
-    mov D, C                ;   int * loc = addr
-    add D, B                ;   loc += i
-    mov [D], A              ;   *loc = value
-    dec B                   ;   i--
-    jmp __core_machine_store_loop
-__core_machine_store_return:
-    mov SP, BP
-    pop BP
-    pop D
-    pop C
-    pop B
-    pop A
-    ret 1
-
-;; void __core_machine_load(int size)
-;; load size amount of integers from popped address
-__core_machine_load:
-    push A
-    push B
-    push C
-    push D
-    push BP
-    mov BP, SP
-    call __core_machine_pop        ; int * addr = __core_machine_pop()
-    add A, [__core_vm_memory] ; addr += vm->memory
-    mov C, A                ; move addr to a different register
-    xor B, B                ; int i = 0
-__core_machine_load_loop:
-    cmp B, [BP + 6]         ; while (i < size)
-    jge __core_machine_load_return
-    mov D, C                ; int * loc = addr
-    add D, B                ; loc += i
-    push [D]                ; int value = *loc
-    call __core_machine_push       ; __core_machine_push(value)
-    inc B                   ; i++
-    jmp __core_machine_load_loop
-__core_machine_load_return:
-    mov SP, BP
-    pop BP
-    pop D
-    pop C
-    pop B
-    pop A
-    ret 1
-
-;; void __core_machine_add()
-;; pop 2 values, add them and push the result
-__core_machine_add:
-    push A
-    push B
-    push BP
-    mov BP, SP
-    call __core_machine_pop
-    mov B, A
-    call __core_machine_pop
-    add A, B
-    push A
-    call __core_machine_push
-    mov SP, BP
-    pop BP
-    pop B
-    pop A
-    ret
-
-;; void __core_machine_subtract()
-;; pop 2 values, subtract them and push the result
-__core_machine_subtract:
-    push A
-    push B
-    push BP
-    mov BP, SP
-    call __core_machine_pop
-    mov B, A
-    call __core_machine_pop
-    sub A, B
-    push A
-    call __core_machine_push
-    mov SP, BP
-    pop BP
-    pop B
-    pop A
-    ret
-
-;; void __core_machine_sign()
-;; pop a value of the stack, if it is 0 or greater push 1, else push -1
-__core_machine_sign:
-    push A
-    push B
-    push BP
-    mov BP, SP
-    call __core_machine_pop
-    cmp A, 0
-    jge __core_machine_sign_ge
-__core_machine_sign_l:
-    push -1
-    jmp __core_machine_sign_push
-__core_machine_sign_ge:
-    push 1
-__core_machine_sign_push:
-    call __core_machine_push
-    mov SP, BP
-    pop BP
-    pop B
-    pop A
-    ret
-
-;; void __core_machine_multiply()
-;; pop 2 values, multiply them and push the result
-__core_machine_multiply:
-    push A
-    push B
-    push BP
-    mov BP, SP
-    call __core_machine_pop
-    mov B, A
-    call __core_machine_pop
-    mul B                 ; will multiply register A with operand, result is a 32-bit integer in Y:A
-    push A
-    call __core_machine_push
-    mov SP, BP
-    pop BP
-    pop B
-    pop A
-    ret
-
-;; void __core_machine_divide()
-;; pop 2 values, divide them and push the result
-__core_machine_divide:
-    push A
-    push B
-    push BP
-    mov BP, SP
-    xor Y, Y
-    call __core_machine_pop
-    mov B, A
-    call __core_machine_pop
-    div B                 ; will divide register Y:A with source, result in A, remainder in Y
-    push A
-    call __core_machine_push
-    mov SP, BP
-    pop BP
-    pop B
-    pop A
     ret
 
 ;; execution on a server tick always starts at .text with the registers and status flags reset

@@ -10,7 +10,6 @@ org 0
 
 ;; data segment -
 ;; NOTE: the _0x00xx labels are just to help visualize the offsets
-;; TODO: do not leak these labels
 ;; NOTE: there are some static variables scattered trough the source, decide on what stays static inline and what can move to the data section
 .data
 _0x0000:
@@ -115,9 +114,7 @@ _0x0153:
 ;; this handler can be used as the default address for interrupt handlers
 ;; this prevents unhandled interrupts from jumping to random locations
 __core_interrupt_handler_default:
-    ;; either interrupt to panic_unknown or to panic_unhandled_interrupt?
-    ;; TODO: make a decision on what this should do
-    ;; jmp __core_interrupt_panic_unhandled_interrupt
+    ;; currently the label just falls trough to the panic_unkown handler
 
 ;; #[interrupt_handler] void __core_interrupt_handler_panic_unkown()
 __core_interrupt_handler_panic_unkown:
@@ -211,7 +208,6 @@ __core_panic_scan:
 ;; initializes the virtual machine located at the label __core_vm
 ;; we expected a label to be at the end of all code named `__core_heap_start`
 __core_machine_new:
-    ;; TODO: currently it uses compiler generated words and labels to initialize, those really should be compile time constants
     ;; TODO: write an heap implementation that doesnt have a 100% memory overhead
     ;; compiler figures out how big the tape must be and defines it as `__core_init_vm_capacity: dw value`
     mov [__core_vm_capacity], __CORE_INIT_VM_CAPACITY
@@ -348,29 +344,31 @@ __core_machine_allocate:
     push Y
     push BP
     mov BP, SP
-    call __core_machine_pop           ; int size = __core_machine_pop()
+    call __core_machine_pop      ; int size = __core_machine_pop()
     mov B, [__core_vm_capacity]  ; int i = vm->capacity
-    dec B                      ; i -= 1
+    dec B                        ; i -= 1
     mov C, [__core_vm_allocated] ; int * loc_allocated = vm->allocated
-    xor X, X                   ; int consecutive_free_cells = 0
+    xor X, X                     ; int consecutive_free_cells = 0
+    xor Y, Y                     ; addr = 0
 __core_machine_allocate_loop_find:
     cmp B, [__core_vm_stack_ptr] ; while (i > vm->stack_ptr)
     jle __core_machine_allocate_loop_break
-    mov D, C                   ; 
-    add D, B                   ; int is_allocated = vm->allocated[i]
-    cmp [D], 0                 ; if !is_allocated
-    jnz __core_machine_allocate_loop_find_false
-    inc X
-    jmp __core_machine_allocate_loop_find_true
-__core_machine_allocate_loop_find_false:
-    xor X, X
-__core_machine_allocate_loop_find_true:
-    cmp X, A                   ; if consecutive_free_cells == size
-    jz __core_machine_allocate_loop_break
-    dec B
-    jnz __core_machine_allocate_loop_find
-__core_machine_allocate_loop_break:
+    mov D, C                     ; 
+    add D, B                     ; int is_allocated = vm->allocated[i]
+    cmp [D], 0                   ; if is_allocated == 0
+    jz __core_machine_allocate_loop_cell_free
+    xor x, x
+    jmp __core_machine_allocate_loop_check
+__core_machine_allocate_loop_cell_free:
+    inc x
+__core_machine_allocate_loop_check:
+    cmp X, A
+    jz __core_machine_allocate_loop_break_success
+    dec b
+    jmp __core_machine_allocate_loop_find
+__core_machine_allocate_loop_break_success:
     mov Y, B                   ; int addr = i
+__core_machine_allocate_loop_break:
     cmp Y, [__core_vm_stack_ptr] ; if addr <= vm->stack_ptr then panic
     jle __core_machine_allocate_loop_panic
     xor B, B                   ; i = 0
@@ -378,6 +376,7 @@ __core_machine_allocate_loop_mark:
     cmp B, A                   ; while (i < size)
     jge __core_machine_allocate_return
     mov D, C                   ; int * loc = vm->allocated
+    add D, Y                   ; loc += addr
     add D, B                   ; loc += i
     mov [D], 1                 ; *loc = 1
     inc B
@@ -640,32 +639,6 @@ __core_machine_divide:
     pop BP
     pop B
     pop A
-    ret
-
-;; TODO: should these be in core?
-;; #[internal] void __core_wrap_arg()
-;; should be called as a foreign function before calling another foreign function that does not use the vm to receive arguments
-;; assumes the argument is on top of the vm stack
-;; NOTE: each argument can only have a size of 1
-__core_wrap_arg:
-    int 3
-    ;; save return address
-    pop B
-    ;; retrieve oak value from the vm stack
-    call __core_machine_pop
-    ;; put in on the stack
-    push A
-    ;; put return address back on so we return to the caller
-    push B
-    ret
-
-;; #[internal] void __core_unwrap_return_value()
-;; should be called as a foreign function after calling another foreign function that does not use the vm to return a value
-;; assumes the return value is still in the A register so it pushes it on the vm stack
-;; NOTE: a return value can only have a size of 1
-__core_unwrap_return_value:
-    push A
-    call __core_machine_push
     ret
 
 ;; execution on a server tick always starts at .text with the registers and status flags reset

@@ -56,7 +56,7 @@ fn generate_stdlib(cwd: &PathBuf, input: String, target: &impl Target) -> Result
 
 pub struct MAR;
 
-// TODO: would like these to be members of the struct
+// TODO: so these should be Cell<T> members of the MAR struct
 // but that would require MAR to be mutable for the Target impl
 // thus requirering the other target implementations to also update their function signatures to &mut self
 static mut saved_global_scope_size: u16 = 0;
@@ -165,19 +165,17 @@ r##"    push {} ;; push value on the vm stack
     }
 
     fn store(&self, size: i32) -> String {
-        // TODO: i16::try_from><f64>() is not implemented? kinda want to do a checked cast here
         String::from(format!(
 r##"    push {} ;; size
     call __core_machine_store
-"##, size as i16))
+"##, u16::try_from(size).ok().unwrap()))
     }
 
     fn load(&self, size: i32) -> String {
-        // TODO: i16::try_from><f64>() is not implemented? kinda want to do a checked cast here
         String::from(format!(
 r##"    push {} ;; size
     call __core_machine_load
-"##, size as i16))
+"##, u16::try_from(size).ok().unwrap()))
     }
 
     fn fn_header(&self, name: String) -> String {

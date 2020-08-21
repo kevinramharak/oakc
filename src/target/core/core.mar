@@ -448,7 +448,7 @@ __core_machine_push:
     jnz __core_machine_push_panic
     mov A, [__core_vm_memory]
     add A, [__core_vm_stack_ptr] ; ref = &vm->memory[vm->stack_ptr]
-    mov [A], [BP + 3]          ; *ref = n
+    mov [A], [BP + 2]          ; *ref = n
     inc [__core_vm_stack_ptr]    ; vm->stack_ptr++
     mov SP, BP
     pop BP
@@ -495,7 +495,7 @@ __core_machine_store:
     call __core_machine_pop        ; int * addr = __core_machine_pop()
     add A, [__core_vm_memory] ; addr += vm->memory
     mov C, A                ; // move addr to a different register
-    mov B, [BP + 6]         ; int i = size
+    mov B, [BP + 5]         ; int i = size
     dec B                   ; i -= 1
 __core_machine_store_loop:
     cmp B, 0                ;   while (i >= 0)
@@ -528,7 +528,7 @@ __core_machine_load:
     mov C, A                ; move addr to a different register
     xor B, B                ; int i = 0
 __core_machine_load_loop:
-    cmp B, [BP + 6]         ; while (i < size)
+    cmp B, [BP + 5]         ; while (i < size)
     jge __core_machine_load_return
     mov D, C                ; int * loc = addr
     add D, B                ; loc += i

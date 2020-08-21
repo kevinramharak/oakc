@@ -283,6 +283,7 @@ __core_machine_establish_stack_frame_restore_args_loop:
 __core_machine_establish_stack_frame_restore_args_return:
     mov SP, BP
     pop BP
+    pop x
     ret 2
 
 ;; void __core_machine_end_stack_frame(size_t return_size, size_t local_scope_size);
@@ -306,15 +307,15 @@ __core_machine_end_stack_frame:
     ;    ptr -= 1;
     ; }
     mov x, [BP + 3]
-__core_machine_establish_stack_frame_preserve_return_value_loop:
+__core_machine_end_stack_frame_preserve_return_value_loop:
     cmp x, 0
-    jz __core_machine_establish_stack_frame_preserve_return_value_clear_stack
+    jz __core_machine_end_stack_frame_preserve_return_value_clear_stack
     call __core_machine_pop
     push a
     dec x
-    jmp __core_machine_establish_stack_frame_preserve_return_value_loop
+    jmp __core_machine_end_stack_frame_preserve_return_value_loop
 
-__core_machine_establish_stack_frame_preserve_return_value_clear_stack:
+__core_machine_end_stack_frame_preserve_return_value_clear_stack:
     ;; Discard the memory setup by the stack frame
     ;; NOTE: the c impl actually pops these (and pop 0's out the memory)
     sub [__core_vm_stack_ptr], [BP + 4]
@@ -325,16 +326,17 @@ __core_machine_establish_stack_frame_preserve_return_value_clear_stack:
     
     ;; Finally, push the returned value back onto the stack for use by
     ;; the parent function.
-__core_machine_establish_stack_frame_restore_return_value_loop:
+__core_machine_end_stack_frame_restore_return_value_loop:
     cmp [BP + 3], 0
-    jz __core_machine_establish_stack_frame_restore_return_value_return
+    jz __core_machine_end_stack_frame_restore_return_value_return
     call __core_machine_push
     DEC [BP + 3]
-    jmp __core_machine_establish_stack_frame_restore_return_value_loop
+    jmp __core_machine_end_stack_frame_restore_return_value_loop
 
-__core_machine_establish_stack_frame_restore_return_value_return:
+__core_machine_end_stack_frame_restore_return_value_return:
     mov SP, BP
     pop BP
+    pop x
     ret 2
 
 ;; void __core_machine_allocate()

@@ -3,11 +3,39 @@
 ;; void __internal_sleep()
 ;;/
 
+;; TODO: maybe make these vectors dynamic
+
+;; static void (*__internal_before_sleep_vector[8])(void);
+__internal_before_sleep_vector: dw 8 dup(0x0000)
+
+;; static void (*__internal_after_sleep_vector[8])(void);
+__internal_after_sleep_vector: dw 8 dup(0x0000)
+
 ;; void __internal_sleep()
-;; suspends execution for this tick, resumes execution on the next tick
+;; suspends execution for this tick, returns execution to the caller after at least one tick
 ;; preserves all register and flags
+;; calls all functions registered with __internal_register_before_sleep before suspending execution
+;; calls all functions registered with __internal_register_after_sleep after waking up but before resuming execution to the caller
+;; NOTE: since we don't have the 10_000 instruction limit that the actual interrupt has we can take as much time as we need to excute the handlers
+;; NOTE: this does mean a _sleep call can take multiple ticks before it returns
 ;; since __core_interrupt_handler_execution_limit_reached interupt does exactly what we want
 ;; we can just delegate to that handler with an interrupt
 __internal_sleep:
+
+__internal_sleep_call_before_sleep_handlers:
+
+__internal_sleep_interrupt:
     int __core_interrupt_execution_limit_reached
+
+__internal_sleep_call_after_sleep_handlers:
+
+__internal_sleep_return:
     ret
+
+__internal_register_before_sleep:
+
+__internal_deregister_before_sleep:
+
+__internal_register_after_sleep:
+
+__internal_deregister_before_sleep:

@@ -1,6 +1,36 @@
 
 #[if(!is_defined("INTERNAL_SLEEP")) {
+    // include guard
     const INTERNAL_SLEEP = 1;
 
+    // include dependencies
+    #[include("../ffi/ffi.mar.ok")]
+
+    // assembly implementation
     #[extern("sleep.mar")]
+
+    // ffi
+    #[doc(
+"Suspends execution for this tick, returns execution to the caller on a future tick
+> calls any registered `before_sleep` handlers before suspending execution
+> calls any registered `after_sleep` handlers before returning execution")]
+    fn Internal::sleep() {
+        __internal_sleep!();
+    }
+
+    fn Internal::register_before_sleep() -> bool {
+        return false;
+    }
+
+    fn Internal::deregister_before_sleep() -> bool {
+        return false;
+    }
+    
+    fn Internal::register_after_sleep() -> bool {
+        return false;
+    }
+
+    fn Internal::deregister_after_sleep() -> bool {
+        return false;
+    }
 }]

@@ -29,6 +29,33 @@ impl MAR {
         self.unique_id.set(id + 1);
         return id;
     }
+
+    fn link_asm(&self, asm: String) -> String {
+        let mut result = String::new();
+        let mut initializers: Vec<String> = Vec::new();
+        let flag = ";; %[runtime_initializer] ";
+        for line in asm.lines() {
+            if (line.starts_with(flag)) {
+                let slice: &str = &line[flag.len()..];
+                let initializer = String::from(slice);
+                initializers.push(initializer);
+            }
+        }
+        for line in asm.lines() {
+            if (line.contains(";; %[generate_initializers]")) {
+                result += &"    mov a, __core_initializer_vector_table_entries\n";
+                result += &"    add a, [__core_initializer_vector_table_length]\n";
+                result += &format!("    add [__core_initializer_vector_table_length], {}\n", initializers.len());
+                for initializer in &initializers {
+                    result += &format!("    mov [a], {}\n    inc a\n", initializer);
+                }
+            } else {
+                result += &format!("{}\n", line);
+            }
+        }
+
+        return result;
+    }
 }
 
 impl Default for MAR {
@@ -227,6 +254,9 @@ __CORE_GLOBAL_SCOPE_SIZE equ {}
 __CORE_INIT_VM_CAPACITY equ {}",
         self.global_scope_size.get(),
         self.init_vm_capacity.get()) + &code;
+
+        // since we need a 'linker' we implemented a simple one in rust
+        asm = self.link_asm(asm);
 
         if let Ok(_) = write("main.mar", asm) {
             return Result::Ok(())

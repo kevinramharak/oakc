@@ -57,6 +57,8 @@ __internal_comport_write_return:
 ;; always starts at the start of the buffer
 ;; clears the written characters with '\0' and moves any remaining characters to the start of the buffer
 __internal_comport_flush:
+    push b
+    push x
     push bp
     mov bp, sp
     ;; setup hwi
@@ -107,4 +109,25 @@ __internal_comport_flush_return:
     sub a, __internal_comport_write_buffer
     mov sp, sp
     pop bp
+    pop x
+    pop b
     ret
+
+;; %[runtime_initializer] __internal_comport_runtime_initializer
+;; this initializer saves the current handler of execution limit reached and replaces it with its own
+;; TODO: we could save a word here by overwriting these instructions with the data, since this function will only be called once at initialisation
+__internal_comport_runtime_initializer:
+    mov [__internal_comport_interrupt_handler_execution_limit_reached_old_handler], [__core_interrupt_execution_limit_reached]
+    mov [__core_interrupt_execution_limit_reached], __internal_comport_interrupt_handler_execution_limit_reached
+    ret
+
+;; static void * __internal_comport_interrupt_handler_execution_limit_reached_old_handler
+__internal_comport_interrupt_handler_execution_limit_reached_old_handler: dw 0
+
+;; #[interrupt_handler] void __internal_comport_interrupt_handler_execution_limit_reached:
+;; this handler flushes the comport and then jumps to the original handler
+__internal_comport_interrupt_handler_execution_limit_reached:
+    push a ;; preserve a since the original handler cares wants to preserve its handler
+    call __internal_comport_flush
+    pop a
+    jmp [__internal_comport_interrupt_handler_execution_limit_reached_old_handler]

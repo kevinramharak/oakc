@@ -9,6 +9,7 @@
 ;; #[dependency="../c/string.h"]
 ;; what it should do:
 ;;  - use stdlib::
+;; TODO: allocate variables on the stack to save push/pop instructions
 prn:
 __oak_prn:
     push B

@@ -22,6 +22,14 @@ pub struct MAR {
     loop_identifiers: RefCell<Vec<u16>>,
 }
 
+impl MAR {
+    fn generate_id(&self) -> u16 {
+        let id = self.unique_id.get();
+        self.unique_id.set(id + 1);
+        return id;
+    }
+}
+
 impl Default for MAR {
     fn default() -> Self {
         MAR { 
@@ -64,7 +72,8 @@ impl Target for MAR {
     }
 
     fn core_postlude(&self) -> String {
-        String::from("__core_heap_start: ;; heap starts at this address")
+        String::from(r"
+__core_heap_start: ;; heap starts at this address")
     }
 
     fn begin_entry_point(&self, global_scope_size: i32, memory_size: i32) -> String {
@@ -72,87 +81,97 @@ impl Target for MAR {
         // we save these values and prefix them to the code in the compile function
         self.global_scope_size.set(u16::try_from(global_scope_size).ok().unwrap());
         self.init_vm_capacity.set(u16::try_from(memory_size).ok().unwrap());
-        String::from(format!(r##"
+        format!(r"
 ;; start of entry point
-__core_main:
-"##))
+__core_main:")
     }
 
     fn end_entry_point(&self) -> String {
         // technically we want to get the return value from main and return it to the hosting environment
         // but since the target implementation is the host, we can do whatever we want here
         // TODO: remove the call to __mar_comport_flush from core
-        String::from("    call __mar_comport_flush\n    RET ;; return from entry point\n")
+        String::from(r"
+    ret ;; return from entry point")
     }
 
     fn establish_stack_frame(&self, arg_size: i32, local_scope_size: i32) -> String {
-        String::from(format!(
-r#"    push {} ;; local_scope_size
+        format!(r"
+    push {} ;; local_scope_size
     push {} ;; arg_size
-    call __core_machine_establish_stack_frame
-"#, u16::try_from(local_scope_size).ok().unwrap(), u16::try_from(arg_size).ok().unwrap()))
+    call __core_machine_establish_stack_frame",
+    u16::try_from(local_scope_size).ok().unwrap(),
+    u16::try_from(arg_size).ok().unwrap())
     }
 
     fn end_stack_frame(&self, return_size: i32, local_scope_size: i32) -> String {
-        String::from(format!(
-r#"    push {} ;; local_scope_size
+        format!(r"
+    push {} ;; local_scope_size
     push {} ;; return size
-    call __core_machine_end_stack_frame
-"#, u16::try_from(local_scope_size).ok().unwrap(), u16::try_from(return_size).ok().unwrap()))
+    call __core_machine_end_stack_frame",
+    u16::try_from(local_scope_size).ok().unwrap(),
+    u16::try_from(return_size).ok().unwrap())
     }
 
     fn load_base_ptr(&self) -> String {
-        String::from("    call __core_machine_load_base_ptr ;; push the base pointer on the stack\n")
+        String::from(r"
+    call __core_machine_load_base_ptr ;; push the base pointer on the stack")
     }
 
     fn push(&self, n: f64) -> String {
         // TODO: i16::try_from><f64>() is not implemented? kinda want to do a checked cast here
-        String::from(format!(
-r##"    push {} ;; push value on the vm stack
-    call __core_machine_push
-"##, n as i16))
+        format!(r"
+    push {} ;; push value on the vm stack
+    call __core_machine_push",
+    n as i16)
     }
 
     fn add(&self) -> String {
-        String::from("    call __core_machine_add\n")
+        String::from(r"
+    call __core_machine_add")
     }
 
     fn subtract(&self) -> String {
-        String::from("    call __core_machine_subtract\n")
+        String::from(r"
+    call __core_machine_subtract")
     }
     
     fn multiply(&self) -> String {
-        String::from("    call __core_machine_multiply\n")
+        String::from(r"
+    call __core_machine_multiply")
     }
     
     fn divide(&self) -> String {
-        String::from("    call __core_machine_divide\n")
+        String::from("
+    call __core_machine_divide")
     }
 
     fn sign(&self) -> String {
-        String::from("    call __core_machine_sign\n")
+        String::from(r"
+    call __core_machine_sign")
     }
 
     fn allocate(&self) -> String {
-        String::from("    call __core_machine_allocate\n")
+        String::from(r"
+    call __core_machine_allocate")
     }
 
     fn free(&self) -> String {
-        String::from("    call __core_machine_free\n")
+        String::from(r"
+    call __core_machine_free")
     }
 
     fn store(&self, size: i32) -> String {
-        String::from(format!(
-r##"    push {} ;; size
+        format!(r"
+    push {} ;; size
     call __core_machine_store
-"##, u16::try_from(size).ok().unwrap()))
+", u16::try_from(size).ok().unwrap())
     }
 
     fn load(&self, size: i32) -> String {
-        String::from(format!(
-r##"    push {} ;; size
+        format!(r"
+    push {} ;; size
     call __core_machine_load
-"##, u16::try_from(size).ok().unwrap()))
+", u16::try_from(size).ok().unwrap())
     }
 
     fn fn_header(&self, name: String) -> String {
@@ -160,51 +179,54 @@ r##"    push {} ;; size
     }
 
     fn fn_definition(&self, name: String, body: String) -> String {
-        String::from(format!(r##"
+        format!(r"
 {}:       ;; definition of {}
-{}    ret ;; returning from {}
-"##, name, name, body, name))
+{}
+    ret ;; returning from {}",
+    name, name, body, name)
     }
 
     fn call_fn(&self, name: String) -> String {
-        String::from(format!("    call {} ;; calling oak function\n", name))
+        format!(r"
+    call {} ;; calling oak function",
+    name)
     }
 
     fn call_foreign_fn(&self, name: String) -> String {
-        String::from(format!("    call {} ;; calling foreign function\n", name))
+        format!(r"
+    call {} ;; calling foreign function",
+        name)
     }
 
     fn begin_while(&self) -> String {
-        let id = self.unique_id.get();
-        self.unique_id.set(id + 1);
+        let id = self.generate_id();
         self.loop_identifiers.borrow_mut().push(id);
-        String::from(format!(
-r#"__generated_begin_while_{}:
+        format!(r"
+__generated_begin_while_{}:
     call __core_machine_pop
     cmp A, 0
-    jz __generated_end_while_{}
-"#, id, id))
+    jz __generated_end_while_{}",
+        id, id)
     }
 
     fn end_while(&self) -> String {
         let id = self.loop_identifiers.borrow_mut().pop().unwrap();
-        String::from(format!(
-r#"    jmp __generated_begin_while_{}
-__generated_end_while_{}:
-"#, id, id))
+        format!(r"
+    jmp __generated_begin_while_{}
+__generated_end_while_{}:",
+        id, id)
     }
 
     fn compile(&self, code: String) -> Result<()> {
         // prefix the saved values as constants
-        let code_with_prefixed_constants = String::from(format!(
-r#"
+        let mut constants = format!(r"
 __CORE_GLOBAL_SCOPE_SIZE equ {}
-__CORE_INIT_VM_CAPACITY equ {}
-"#, self.global_scope_size.get(), self.init_vm_capacity.get())) + code.as_str();
-        if let Ok(_) = write("OUTPUT.mar", code_with_prefixed_constants) {
+__CORE_INIT_VM_CAPACITY equ {}",
+        self.global_scope_size.get(),
+        self.init_vm_capacity.get());
+        if let Ok(_) = write("main.mar", constants + &code) {
             return Result::Ok(())
         }
-        return Result::Err(Error::new(ErrorKind::Other,
-            "unabe to compile to MAR"));
+        return Result::Err(Error::new(ErrorKind::Other, "unabe to compile to MAR"));
     }
 }

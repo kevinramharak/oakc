@@ -1,0 +1,23 @@
+;; it doesnt actually wrap, it just knows about the different abi's and makes them communicate
+
+__ffi_pass_arg_by_value:
+    pop b                      ;; save return address
+    call __core_machine_pop    ;; get value from vm stack
+    push a                     ;; push value
+    push b                     ;; push back return address
+    ret                        ;; return from caller
+
+;; unwraps a pointer into vm->memory from the vm stack to the mar stack
+__ffi_pass_arg_by_reference:
+    pop b                      ;; save return address
+    call __core_machine_pop    ;; get value from vm stack
+    add a, [__core_vm_memory]
+    push a                     ;; push value
+    push b                     ;; push back return address
+    ret                        ;; return from caller
+
+;; wraps the mar return value (in A) to the vm stack
+__ffi_pass_return_value:
+    push a
+    call __core_machine_push
+    ret

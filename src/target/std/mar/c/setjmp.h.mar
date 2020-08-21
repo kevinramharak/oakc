@@ -1,1 +1,8 @@
 ;; http://www.cplusplus.com/reference/csetjmp/
+
+;; http://www.csl.mtu.edu/cs4411.ck/common/Coroutines.pdf
+;; can use sleep ticks and setjmp logic to setup a naive thread system
+;; this would also allow to upp the execution environment from native MAR to a smart scheduler
+;; would allow to run multiple programs
+
+;; could even save state to the floppy disk somehow

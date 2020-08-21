@@ -1,0 +1,70 @@
+;;/
+;; Hardware - Universal Communication Port (UCP or comport)
+;; Address:   0x000D
+;; Id:        0x000D
+;; Docs:      https://github.com/simon987/Much-Assembly-Required/wiki/(Hardware)-Universal-Com-Port
+;;/
+
+__MAR_HWID_COMPORT equ 0x000D
+
+__MAR_COMPORT_BUFFER_CLEAR   equ 0 ;; / Clears the internal buffer
+__MAR_COMPORT_POLL           equ 1 ;; / Copy all internal buffer messages to address X, sets B to the number of messages copied
+__MAR_COMPORT_FRONT_PORT_OUT equ 2 ;; / Copies 8 words starting at address X to the front port if there is a valid receiver present. Sets/resets B to indicate success
+__MAR_COMPORT_SELF_OUT       equ 3 ;; / Copies 8 words starting at address X to the internal message buffer. Sets/resets B to indicate success
+__MAR_COMPORT_CONSOLE_CLEAR  equ 4 ;; / Clears the console
+
+;; void __mar_comport_buffer_clear()
+;; clears the internal hardware message buffer
+__mar_comport_buffer_clear:
+    mov A, __MAR_COMPORT_BUFFER_CLEAR
+    hwi __MAR_HWID_COMPORT
+    ret
+
+;; size_t __mar_comport_poll(char * dest)
+;; copies all messages (40 messages * 8 words for each message) in the internal buffer to the destination
+;; returns the number of messages copied
+__mar_comport_poll:
+    push B
+    push X
+    mov X, [SP + 3]
+    mov A, __MAR_COMPORT_POLL
+    hwi __MAR_HWID_COMPORT
+    mov A, B
+    pop X
+    pop B
+    ret
+
+;; bool __mar_comport_front_port_out(const char * source)
+;; copies 8 words from source to the object in front of the cubot if it has a com port
+;; returns a boolean stating success
+__mar_comport_front_port_out:
+    push B
+    push X
+    mov X, [SP + 3]
+    mov A, __MAR_COMPORT_FRONT_PORT_OUT
+    hwi __MAR_HWID_COMPORT
+    mov A, B
+    pop X
+    pop B
+    ret
+
+;; bool __mar_comport_self_out(const char * source)
+;; copies 8 words from source to the internal message buffer
+;; returns a boolean stating success
+__mar_comport_self_out:
+    push B
+    push X
+    mov X, [SP + 3]
+    mov A, __MAR_COMPORT_SELF_OUT
+    hwi __MAR_HWID_COMPORT
+    mov A, B
+    pop X
+    pop B
+    ret
+
+;; void __mar_comport_console_clear()
+;; clears the console
+__mar_comport_console_clear:
+    mov A, __MAR_COMPORT_CONSOLE_CLEAR
+    hwi __MAR_HWID_COMPORT
+    ret

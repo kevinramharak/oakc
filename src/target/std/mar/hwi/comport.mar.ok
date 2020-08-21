@@ -1,0 +1,43 @@
+
+#[if(!is_defined("MAR_COMPORT")) {
+    // include guard
+    const MAR_COMPORT = 1;
+
+    // include dependencies
+    #[include("../ffi/ffi.mar.ok")]
+
+    // include asm implementation
+    #[extern("comport.mar")]
+
+    // define ffi
+    #[doc("Clears the internal hardware message buffer")]
+    fn HWI::comport_buffer_clear() {
+        __mar_comport_buffer_clear!();
+    }
+
+    #[doc("Copies all messages (40 messages x 8 words for each message) in the internal buffer to the destination. Returns the number of messages copied")]
+    fn HWI::comport_poll(destination: &char) -> num {
+        __ffi_pass_argument_by_reference!(destination);
+        __mar_comport_poll!();
+        return __ffi_pass_return_value!() as num;
+    }
+
+    #[doc("Copies 8 words from `source` to the object in front of the cubot if it has a com port. Returns a boolean stating success")]
+    fn HWI::comport_front_port_out(source: &char) -> bool {
+        __ffi_pass_argument_by_reference!(source);
+        __mar_comport_front_port_out!();
+        return __ffi_pass_return_value!() as bool;
+    }
+
+    #[doc("Copies 8 words from `source` to the internal message buffer. Returns a boolean stating success")]
+    fn HWI::comport_self_out(source: &char) -> bool {
+        __ffi_pass_argument_by_reference!(source);
+        __mar_comport_front_port_out!();
+        return __ffi_pass_return_value!() as bool;
+    }
+
+    #[doc("Clears the console")]
+    fn HWI::comport_console_clear() {
+        __mar_comport_console_clear!();
+    }
+}]

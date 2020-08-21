@@ -1,0 +1,10 @@
+
+#[if(!is_defined("FFI")) {
+    // include guard
+    const FFI = 1;
+
+    // include dependencies
+
+    // include asm implementation
+    #[extern("ffi.mar")]
+}]

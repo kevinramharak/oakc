@@ -8,72 +8,121 @@
 
 __C_NULL equ 0x0000
 
-;; TODO: implement the ones needed
-
 ;; void * memccpy(void *, const void *, int, size_t);
+__c_memccpy:
+    mov a, __C_NULL
+    ret 3
 
 ;; void * memchr(const void *, int, size_t);
+__c_memchr:
+    mov a, __C_NULL
+    ret 3
 
 ;; int memcmp(const void *, const void *, size_t);
+__c_memcmp:
+    mov a, __C_NULL
+    ret 3
 
 ;; void * memcpy(void *, const void *, size_t);
+__c_memcpy:
+    mov a, __C_NULL
+    ret 3
 
 ;; void *memmove(void *, const void *, size_t);
+__c_memmove:
+    mov a, __C_NULL
+    ret 3
 
 ;; void * memset(void *, int, size_t);
+__c_memset:
+    mov a, __C_NULL
+    ret 2
 
 ;; char * strcat(char *, const char *);
+__c_strcat:
+    mov a, __C_NULL
+    ret 2
 
 ;; char * strchr(const char *, int);
+__c_strchr:
+    mov a, __C_NULL
+    ret 2
 
 ;; int strcmp(const char *, const char *);
-
-;; int strcoll(const char *, const char *);
+__c_strcmp:
+    mov a, __C_NULL
+    ret 2
 
 ;; char * strcpy(char *, const char *);
+__c_strcpy:
+    mov a, __C_NULL
+    ret 2
 
 ;; size_t strcspn(const char *, const char *);
-
-;; char * strdup(const char *);
+__c_strcspn:
+    mov a, __C_NULL
+    ret 2
 
 ;; char * strerror(int);
+__c_strerror:
+    mov a, __C_NULL
+    ret 1
 
 ;; size_t __c_strlen(const char * str);
 __c_strlen:
-    push BP
-    mov BP, SP
+    push bp
+    mov bp, sp
     ;; [BP + 0] = old BP
     ;; [BP + 1] = return address
     ;; [BP + 2] = const char * str
-    mov A, [BP + 2]
+    mov a, [bp + 2]
 __c_strlen_loop:
-    cmp [A], 0
+    cmp [a], 0
     jz __c_strlen_return
-    inc A
+    inc a
     jmp __c_strlen_loop
 __c_strlen_return:
-    sub A, [BP + 2]
-    mov SP, BP
-    pop BP
+    sub a, [bp + 2]
+    mov sp, bp
+    pop bp
     ret 1
 
 ;; char * strncat(char *, const char *, size_t);
+__c_strncat:
+    mov a, __C_NULL
+    ret 3
 
 ;; int strncmp(const char *, const char *, size_t);
+__c_strncmp:
+    mov a, __C_NULL
+    ret 3
 
 ;; char * strncpy(char *, const char *, size_t);
+__c_strncpy:
+    mov a, __C_NULL
+    ret 3
 
 ;; char * strpbrk(const char *, const char *);
+__c_strpbrk:
+    mov a, __C_NULL
+    ret 2
 
 ;; char * strrchr(const char *, int);
+__c_strrchr:
+    mov a, __C_NULL
+    ret 2
 
 ;; size_t strspn(const char *, const char *);
+__c_strspn:
+    mov a, __C_NULL
+    ret 2
 
 ;; char * strstr(const char *, const char *);
+__c_strstr:
+    mov a, __C_NULL
+    ret 2
 
 ;; char * strtok(char *, const char *);
-
-;; char * strtok_r(char *, const char *, char **);
-
-;; size_t strxfrm(char *, const char *, size_t);
-
+__c_strtok:
+    mov a, __C_NULL
+    ret 2

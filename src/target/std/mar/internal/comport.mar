@@ -1,32 +1,17 @@
 ;;/
-;; Hardware - Universal Communication Port (UCP or comport)
-;; Address:   0x000D
-;; Id:        0x000D
-;; Docs:      https://github.com/simon987/Much-Assembly-Required/wiki/(Hardware)-Universal-Com-Port
+;; This file defines 2 functions to make it easier to work with the console
+;; size_t __mar_comport_write(const char * str, size_t length) - writes `str` with `length` as length to an internal buffer, returns the amount of characters written.
+;; size_t __mar_comport_flush() - flushes internal buffer to the hardware internal buffer, returns the amount of characters flushed. Amount flushed is always a multiple of 8
 ;;/
 
 __MAR_HWID_COMPORT equ 0x000D
 
-__MAR_COMPORT_BUFFER_CLEAR   equ 0 ;; / Clears the internal buffer
-__MAR_COMPORT_POLL           equ 1 ;; / Copy all internal buffer messages to address X, sets B to the number of messages copied
-__MAR_COMPORT_FRONT_PORT_OUT equ 2 ;; / Copies 8 words starting at address X to the front port if there is a valid receiver present. Sets/resets B to indicate success
 __MAR_COMPORT_SELF_OUT       equ 3 ;; / Copies 8 words starting at address X to the internal message buffer. Sets/resets B to indicate success
-__MAR_COMPORT_CONSOLE_CLEAR  equ 4 ;; / Clears the console
 
 ;; static char[320] __mar_comport_write_buffer // 40 *  8 word wide messages
 __mar_comport_write_buffer: dw 320 dup(0x0000)
 ;; static size_t __mar_comport_write_buffer_length //
 __mar_comport_write_buffer_length: dw 0x0000
-
-;; what kind of api do we need
-;; - write(const char * str, size_t length) // write length amount of characters from str to the comport with an intermediate buffer
-;; - flush() // flush the intermediate buffer
-;; ? how big is the intermediate buffer (40 * 40 maybe?) ! yes 40 * 8 = 320 should work best, this way we can remove the hwi interfacing from write()
-;; ? what exactly does flush do                          ! it should interface with the hardware to write the intermediate buffer to the internal one
-;; ?                                                     ! it should return the amount of characters flushed (multiple of 8)
-;; with these 2 calls we can implement stdio in a way that abstracts the write and flush calls, their return values and when to use the sleep functionality
-;; so these 2 calls are just a fixed interface on top of the actual hardware
-;; by using these both and combinining their return values with tick knowledge 
 
 ;; size_t write(const char * str, size_t length)
 ;; a buffered write to the self out port of the comport (console)
@@ -113,7 +98,7 @@ __mar_comport_flush_cleanup_loop:
     ;; if not b will be at wherever we are done with shifting
     cmp b, __mar_comport_write_buffer_length
     jz __mar_comport_flush_return
-    mov [b], 0
+    xor [b], [b]
     inc b
     jmp __mar_comport_flush_cleanup_loop
 __mar_comport_flush_return:
@@ -122,62 +107,4 @@ __mar_comport_flush_return:
     sub a, __mar_comport_write_buffer
     mov sp, sp
     pop bp
-    ret
-
-;;; below is a an interface to interact with the hardware interrupts
-
-;; void __mar_comport_buffer_clear()
-;; clears the internal hardware message buffer
-__mar_comport_buffer_clear:
-    mov A, __MAR_COMPORT_BUFFER_CLEAR
-    hwi __MAR_HWID_COMPORT
-    ret
-
-;; size_t __mar_comport_poll(char * dest)
-;; copies all messages (each 8 words) in the internal buffer to the destination
-;; returns the number of messages copied
-__mar_comport_poll:
-    push B
-    push X
-    mov X, [SP + 3]
-    mov A, __MAR_COMPORT_POLL
-    hwi __MAR_HWID_COMPORT
-    mov A, B
-    pop X
-    pop B
-    ret
-
-;; bool __mar_comport_front_port_out(const char * source)
-;; copies 8 words from source to the object in front of the cubot if it has a com port
-;; returns a boolean stating success
-__mar_comport_front_port_out:
-    push B
-    push X
-    mov X, [SP + 3]
-    mov A, __MAR_COMPORT_FRONT_PORT_OUT
-    hwi __MAR_HWID_COMPORT
-    mov A, B
-    pop X
-    pop B
-    ret
-
-;; bool __mar_comport_self_out(const char * source)
-;; copies 8 words from source to the internal message buffer
-;; returns a boolean stating success
-__mar_comport_self_out:
-    push B
-    push X
-    mov X, [SP + 3]
-    mov A, __MAR_COMPORT_SELF_OUT
-    hwi __MAR_HWID_COMPORT
-    mov A, B
-    pop X
-    pop B
-    ret
-
-;; void __mar_comport_console_clear()
-;; clears the console
-__mar_comport_console_clear:
-    mov A, __MAR_COMPORT_CONSOLE_CLEAR
-    hwi __MAR_HWID_COMPORT
     ret

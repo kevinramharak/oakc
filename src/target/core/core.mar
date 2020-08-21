@@ -97,7 +97,7 @@ _0x00F8:
     ;; static const char * __core_panic_stack_underflow
     __core_panic_stack_underflow: dw "\nERR_STACK_UNDERFLOW", 0 ;; 21 length
     ;; static void * __core_jump_on_wake
-    __core_jump_on_wake: dw 0x0000 ;; 0 represents no jump, non-0 represent a jump location
+    __core_jump_on_wake: dw __core_start_initialize_runtime ;; intial value is points to initialization, which makes the `jmp [__core_jump_on_wake]` a no-op
     ;; static size_t __core_execution_limit_reached_saved_sp
     __core_execution_limit_reached_saved_sp: dw 0
     ;; static size_t __core_execution_limit_reached_saved_bp
@@ -155,7 +155,6 @@ __core_interrupt_handler_execution_limit_reached:
     mov [__core_execution_limit_reached_saved_sp], sp
     mov [__core_execution_limit_reached_saved_bp], bp
     mov [__core_jump_on_wake], __core_interrupt_handler_execution_limit_reached_on_wake
-    call __mar_comport_flush ;; TODO: remove this from core
     brk
 __core_interrupt_handler_execution_limit_reached_on_wake:
     mov bp, [__core_execution_limit_reached_saved_bp]
@@ -646,9 +645,7 @@ __core_machine_divide:
 ;; #[entry] void __core_start()
 .text
 __core_start:
-    ;; if * __core_jump_on_wake != null then jump to that pointer
-    cmp [__core_jump_on_wake], 0
-    jnz [__core_jump_on_wake]
+    jmp [__core_jump_on_wake]
 
     ;; setup a loop to call all intializer functions
 __core_start_initialize_runtime:
@@ -674,6 +671,4 @@ __core_spin:
 __core_brk:
     brk
 
-;; the compiler will genererate the following:
-;; oak program entrypoint. after the runtime is initialized it will call this function
-;; __core_main:
+;; oak code will be generated below

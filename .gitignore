@@ -4,3 +4,4 @@ Cargo.lock
 *.exe
 .vscode
 main
+main.mar

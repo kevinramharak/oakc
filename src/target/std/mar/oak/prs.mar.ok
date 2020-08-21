@@ -4,7 +4,7 @@
     const OAK_PRS = 1;
     // include dependencies
     #[include("../c/string.h.mar.ok")]
-    #[include("../mar/comport.mar.ok")]
+    #[include("../internal/comport.mar.ok")]
     // include asm implementation
     #[extern("prs.mar")]
 }]

@@ -1,9 +1,139 @@
+#[header("implementation of the C standard library file '<string.h>'")]
 
-#[if(!is_defined("C_STRING")) {
+#[if(!is_defined("NULL")) {
+    const NULL = 0;
+}]
+
+#[if(!is_defined("C_STRING_GUARD")) {
     // include guard
-    const C_STRING = 1;
+    const C_STRING_GUARD = 1;
+
     // include dependencies
+    #[include("../ffi/ffi.mar.ok")]
 
     // include asm implementation
     #[extern("string.h.mar")]
+
+    // define ffi
+
+    #[doc("Copies up to `length` amount of words or until encountering `c` from the location pointed to by `source` to the memory location pointed to by `destination`.")]
+    fn C::memccpy(destination: &void, source: &void, c: char, length: num) -> &void {
+            // __ffi_pass_arg_by_value!(length);
+            // __ffi_pass_arg_by_value!(c);
+            // __ffi_pass_arg_by_reference!(source);
+            // __ffi_pass_arg_by_reference!(destination);
+            // __c_memccpy!();
+            // return __ffi_pass_return_value!() as &void;
+            for (let i = 0; i < length; i += 1) {
+                (destination as &char)[i] = (source as &char)[i];
+                if ((destination as &char)[i] == c) {
+                    // TODO: replace with a break statement
+                    i = length;
+                }
+            }
+            return destination;
+    }
+
+    #[doc("Finds the first occurence of `needle` in `haystack` up till `length` amount of words. Returns a pointer to the found `needle` location or `NULL` if not found.")]
+    fn C::memchr(haystack: &void, needle: char, length: num) -> &void {
+        let val: &void = NULL as &void;
+        for (let i = 0; i < length; i += 1) {
+            if ((haystack as &char)[i] == needle) {
+                // TODO: replace with a return
+                val = (haystack + i) as &void;
+                i = length;
+            }
+        }
+        return val;
+    }
+
+    #[doc("")]
+    fn C::memcmp(lhs: &void, rhs: &void, length: num) -> num {
+        return 0;
+    }
+
+    #[doc("Copies `length` amount of words from the location pointed to by `source` to the memory location pointed to by `destination`.")]
+    fn C::memcpy(destination: &void, source: &void, length: num) -> &void {
+            // __ffi_pass_arg_by_value!(length);
+            // __ffi_pass_arg_by_reference!(source);
+            // __ffi_pass_arg_by_reference!(destination);
+            // __c_memccpy!();
+            // return __ffi_pass_return_value!() as &void;
+            for (let i = 0; i < length; i += 1) {
+                (destination as &num)[i] = (source as &num)[i];
+            }
+            return destination;
+    }
+
+    #[doc("Copies `length` amount of words from the location pointed by `source` to the location pointed to by `destination`. Copying takes place as if an intermediate buffer were used, allowing the `destination` and `source` to overlap.")]
+    fn C::memmove(destination: &void, source: &void, length: num) -> &void {
+
+    }
+
+    fn C::memset() {
+
+    }
+
+    fn C::strcat() {
+
+    }
+
+    fn C::strchr() {
+
+    }
+
+    fn C::strcmp() {
+
+    }
+
+    fn C::strcpy() {
+
+    }
+
+    fn C::strcspn() {
+
+    }
+
+    fn C::strerror() {
+
+    }
+
+    #[doc("Returns the length of the C string `string`")]
+    fn C::strlen(string: &char) -> num {
+        __ffi_pass_arg_by_reference!(string as &void);
+        __c_strlen!();
+        return __ffi_pass_return_value!() as num;
+    }
+
+    fn C::strncat() {
+
+    }
+
+    fn C::strncmp() {
+
+    }
+
+    fn C::strncpy() {
+
+    }
+
+    fn C::strpbrk() {
+
+    }
+
+    fn C::strrchr() {
+
+    }
+
+    fn C::strspn() {
+
+    }
+
+    fn C::strstr() {
+
+    }
+
+    fn C::strtok() {
+
+    }
 }]

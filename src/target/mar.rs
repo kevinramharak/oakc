@@ -92,18 +92,22 @@ impl MAR {
         // generate intializer table
         result.insert(initializer_table_index, format!("    __core_initializer_vector_table_length: dw {}", initializers.len()));
         initializer_table_index += 1;
+        destructor_table_index += 1;
         let initializers_length = initializers.len();
         if initializers_length > 0 {
             result.insert(initializer_table_index, String::from("    __core_initializer_vector_table_entries:"));
             initializer_table_index += 1;
+            destructor_table_index += 1;
             for initializer in initializers {
                 result.insert(initializer_table_index, format!("    dw {}", initializer));
+                destructor_table_index += 1;
                 initializer_table_index += 1;
             }
         }
         let initializer_table_padding = initializer_table_size - initializers_length;
         if (initializer_table_padding > 0) {
-            result.insert(initializer_table_index + 1, format!("    dw {} dup(0x0000);; remaining padding", initializer_table_padding));
+            result.insert(initializer_table_index, format!("    dw {} dup(0xdead);; remaining padding", initializer_table_padding));
+            destructor_table_index += 1;
         }
 
         // generate destructor table
@@ -120,7 +124,7 @@ impl MAR {
         }
         let destructor_table_padding = destructor_table_size - destructors_length;
         if (destructor_table_padding > 0) {
-            result.insert(destructor_table_index + 1, format!("    dw {} dup(0x0000);; remaining padding", destructor_table_padding));
+            result.insert(destructor_table_index, format!("    dw {} dup(0xdead);; remaining padding", destructor_table_padding));
         }
 
         

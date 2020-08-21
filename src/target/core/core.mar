@@ -64,15 +64,16 @@ _0x0044:
     ;; probably by owning the software interrupt table and providing an interface to interact with it
 _0x0080:
     ;; NOTE: the following line generates a intializer vector table
-    ;; %[generate_initializer_table] 0x3c
-    dw 0, 0x3b dup(0xdead)
+    ;; %[generate_initializer_table] 0x3b
+    dw 0, 0x3a dup(0xdead) ;; this padding is just to preserve the correct memory layout. if a table is generated this line will be removed
     ;; struct {
     ;;   size_t length
     ;;   void * entries[length]
     ;; } __core_initializer_vector_table;
+_0x00BC:
     ;; NOTE: the following line generates a destructor vector table
-    ;; %[generate_destructor_table] 0x3c
-    dw 0, 0x3b dup(0xdead)
+    ;; %[generate_destructor_table] 0x3b
+    dw 0, 0x3a dup(0xdead) ;; this padding is just to preserve the correct memory layout. if a table is generated this line will be removed
     ;; struct  {
     ;;   size_t length
     ;;   void * entries[length]

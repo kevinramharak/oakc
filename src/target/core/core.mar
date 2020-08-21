@@ -65,7 +65,7 @@ _0x0044:
 _0x0080:
     ;; NOTE: the following line generates a intializer vector table
     ;; %[generate_initializer_table] 0x3b
-    dw 0, 0x3a dup(0xdead) ;; this padding is just to preserve the correct memory layout. if a table is generated this line will be removed
+    dw 1, __core_machine_new, 0x39 dup(0xdead) ;; this padding is just to preserve the correct memory layout. if a table is generated this line will be removed
     ;; struct {
     ;;   size_t length
     ;;   void * entries[length]

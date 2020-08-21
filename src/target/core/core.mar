@@ -72,7 +72,7 @@ _0x0080:
     __core_initializer_vector_table_entries: dw __core_machine_new
     ;; }
     ;; unused padding (0xdead is a value that is easily recognized)
-    dw 0x76 dup(0xdead)
+    __core_initializer_vector_table_padding: dw 0x76 dup(0xdead)
 _0x00F8:
     ;; static variables used by __core_* functions
     ;; static struct machine {
@@ -144,7 +144,7 @@ _0x0163:
 
 ;; #[interrupt_handler] void __core_interrupt_handler_execution_limit_reached()
 ;; this has to be in core to make sure a program keeps its execution state in between ticks
-;; std can overwrite the interupt vector entry to a different location to add more features (like a __mar_comport_flush call)
+;; std can overwrite the interupt vector entry to a different location to add more features (like a __internal_comport_flush call)
 __core_interrupt_handler_execution_limit_reached:
     push a
     push b

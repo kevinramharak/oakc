@@ -1,0 +1,6 @@
+
+#[if(!is_defined("INTERNAL_SLEEP")) {
+    const INTERNAL_SLEEP = 1;
+
+    #[extern("sleep.mar")]
+}]

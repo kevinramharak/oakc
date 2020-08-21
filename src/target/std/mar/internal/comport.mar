@@ -1,24 +1,24 @@
 ;;/
 ;; This file defines 2 functions to make it easier to work with the console
-;; size_t __mar_comport_write(const char * str, size_t length) - writes `str` with `length` as length to an internal buffer, returns the amount of characters written.
-;; size_t __mar_comport_flush() - flushes internal buffer to the hardware internal buffer, returns the amount of characters flushed. Amount flushed is always a multiple of 8
+;; size_t __internal_comport_write(const char * str, size_t length) - writes `str` with `length` as length to an internal buffer, returns the amount of characters written.
+;; size_t __internal_comport_flush() - flushes internal buffer to the hardware internal buffer, returns the amount of characters flushed. Amount flushed is always a multiple of 8
 ;;/
 
-__MAR_HWID_COMPORT equ 0x000D
+__INTERNAL_HWID_COMPORT equ 0x000D
 
-__MAR_COMPORT_SELF_OUT       equ 3 ;; / Copies 8 words starting at address X to the internal message buffer. Sets/resets B to indicate success
+__INTERNAL_COMPORT_SELF_OUT       equ 3 ;; / Copies 8 words starting at address X to the internal message buffer. Sets/resets B to indicate success
 
-;; static char[320] __mar_comport_write_buffer // 40 *  8 word wide messages
-__mar_comport_write_buffer: dw 320 dup(0x0000)
-;; static size_t __mar_comport_write_buffer_length //
-__mar_comport_write_buffer_length: dw 0x0000
+;; static char[320] __internal_comport_write_buffer // 40 *  8 word wide messages
+__internal_comport_write_buffer: dw 320 dup(0x0000)
+;; static size_t __internal_comport_write_buffer_length //
+__internal_comport_write_buffer_length: dw 0x0000
 
 ;; size_t write(const char * str, size_t length)
 ;; a buffered write to the self out port of the comport (console)
 ;; returns the amount of characters written
 ;; technically this just writes to an internal buffer
 ;; needs a flush call to actually write the contents to the internal buffer
-__mar_comport_write:
+__internal_comport_write:
     push b
     push bp
     mov bp, sp
@@ -28,22 +28,22 @@ __mar_comport_write:
     ;; [BP + 2] = return addeess
     ;; [BP + 3] = const char * str
     ;; [BP + 4] = size_t length
-    mov a, __mar_comport_write_buffer
-    add a, [__mar_comport_write_buffer_length]
+    mov a, __internal_comport_write_buffer
+    add a, [__internal_comport_write_buffer_length]
     mov b, [bp + 3]
     push [bp + 4]
-__mar_comport_write_loop:
+__internal_comport_write_loop:
     cmp [bp + 4], 0
-    jz __mar_comport_write_return
-    cmp [__mar_comport_write_buffer_length], 320
-    jz __mar_comport_write_return
+    jz __internal_comport_write_return
+    cmp [__internal_comport_write_buffer_length], 320
+    jz __internal_comport_write_return
     mov [a], [b]
     inc a
     inc b
-    inc [__mar_comport_write_buffer_length]
+    inc [__internal_comport_write_buffer_length]
     dec [bp + 4]
-    jmp __mar_comport_write_loop
-__mar_comport_write_return:
+    jmp __internal_comport_write_loop
+__internal_comport_write_return:
     pop a
     sub a, [bp + 4]
     mov sp, bp
@@ -56,55 +56,55 @@ __mar_comport_write_return:
 ;; returns the amount of characters written to the internal buffer
 ;; always starts at the start of the buffer
 ;; clears the written characters with '\0' and moves any remaining characters to the start of the buffer
-__mar_comport_flush:
+__internal_comport_flush:
     push bp
     mov bp, sp
     ;; setup hwi
-    mov x, __mar_comport_write_buffer
-    mov a, __MAR_COMPORT_SELF_OUT
+    mov x, __internal_comport_write_buffer
+    mov a, __INTERNAL_COMPORT_SELF_OUT
     ;; keep flushing until we get a false or if we are at the end of the buffer
-__mar_comport_flush_loop:
-    cmp [__mar_comport_write_buffer_length], 0
-    jle __mar_comport_flush_clear_length
-    hwi __MAR_HWID_COMPORT
+__internal_comport_flush_loop:
+    cmp [__internal_comport_write_buffer_length], 0
+    jle __internal_comport_flush_clear_length
+    hwi __INTERNAL_HWID_COMPORT
     cmp b, 0
-    jz __mar_comport_flush_shift
+    jz __internal_comport_flush_shift
     add x, 8
-    sub [__mar_comport_write_buffer_length], 8
-    jmp __mar_comport_flush_loop
-__mar_comport_flush_clear_length:
-    mov [__mar_comport_write_buffer_length], 0 ;; it might have underflowed into some FFFx value, just reset it to 0
-__mar_comport_flush_shift:
-    mov b, __mar_comport_write_buffer
+    sub [__internal_comport_write_buffer_length], 8
+    jmp __internal_comport_flush_loop
+__internal_comport_flush_clear_length:
+    mov [__internal_comport_write_buffer_length], 0 ;; it might have underflowed into some FFFx value, just reset it to 0
+__internal_comport_flush_shift:
+    mov b, __internal_comport_write_buffer
     push x ;; save this to calculate the amount of characters flushed later
-__mar_comport_flush_shift_loop:
+__internal_comport_flush_shift_loop:
     ;; once we are done flushing we write the remaing part of the buffer to the start of the buffer
     ;; if we flushed everything x will be equal the length location
-    cmp [__mar_comport_write_buffer_length], 0
-    jz __mar_comport_flush_cleanup
-    cmp x, __mar_comport_write_buffer_length
-    jz __mar_comport_flush_cleanup
+    cmp [__internal_comport_write_buffer_length], 0
+    jz __internal_comport_flush_cleanup
+    cmp x, __internal_comport_write_buffer_length
+    jz __internal_comport_flush_cleanup
     mov [b], [x]
     inc b
     inc x
-    dec [__mar_comport_write_buffer_length]
-    jmp __mar_comport_flush_shift_loop
-__mar_comport_flush_cleanup:
+    dec [__internal_comport_write_buffer_length]
+    jmp __internal_comport_flush_shift_loop
+__internal_comport_flush_cleanup:
     ;; adjust the length property to how many unflushed characters are still in the buffer
-    mov [__mar_comport_write_buffer_length], b
-    sub [__mar_comport_write_buffer_length], __mar_comport_write_buffer
-__mar_comport_flush_cleanup_loop:
+    mov [__internal_comport_write_buffer_length], b
+    sub [__internal_comport_write_buffer_length], __internal_comport_write_buffer
+__internal_comport_flush_cleanup_loop:
     ;; if the buffer is fully flushed b will equal the length location
     ;; if not b will be at wherever we are done with shifting
-    cmp b, __mar_comport_write_buffer_length
-    jz __mar_comport_flush_return
+    cmp b, __internal_comport_write_buffer_length
+    jz __internal_comport_flush_return
     xor [b], [b]
     inc b
-    jmp __mar_comport_flush_cleanup_loop
-__mar_comport_flush_return:
+    jmp __internal_comport_flush_cleanup_loop
+__internal_comport_flush_return:
     ;; return the amount of characters flushed
     pop a
-    sub a, __mar_comport_write_buffer
+    sub a, __internal_comport_write_buffer
     mov sp, sp
     pop bp
     ret

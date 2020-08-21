@@ -64,10 +64,11 @@ __oak_getch_fetch:
     hwi HWID_KEYBOARD
     cmp B, 0   ; if the result is zero there was no character in the keyboard buffer
     jnz __oak_getch_newline_check
-    ;;call __core_sleep ; to prevent spinning and draining the server / have the server terminate our execution we use sleep
+    call __internal_sleep
     jmp __oak_getch_fetch
 __oak_getch_newline_check:
-    ;; NOTE: oakc examples ignore '\r' and work with '\n' characters, so we do a switcheroo
+    ;; NOTE: the keyboard returns '\r' on an enter, a '\n' is impossible to receive as input
+    ;; NOTE: therefore we treat '\r' as a '\n'
     cmp B, KEY_ENTER ;; if key is a '\r' character, replace it with a '\n' character
     jnz __oak_getch_return
     mov B, KEY_NEWLINE

@@ -49,7 +49,7 @@
 
     #[doc("")]
     fn C::memcmp(lhs: &void, rhs: &void, length: num) -> num {
-        return 0;
+        return NULL;
     }
 
     #[doc("Copies `length` amount of words from the location pointed to by `source` to the memory location pointed to by `destination`.")]
@@ -67,7 +67,7 @@
 
     #[doc("Copies `length` amount of words from the location pointed by `source` to the location pointed to by `destination`. Copying takes place as if an intermediate buffer were used, allowing the `destination` and `source` to overlap.")]
     fn C::memmove(destination: &void, source: &void, length: num) -> &void {
-
+        return NULL as &void;
     }
 
     fn C::memset() {

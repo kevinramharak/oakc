@@ -1,0 +1,13 @@
+;;/
+;; This file defines 1 function to make it easier to work with execution spanning multiple ticks
+;; void __internal_sleep()
+;;/
+
+;; void __internal_sleep()
+;; suspends execution for this tick, resumes execution on the next tick
+;; preserves all register and flags
+;; since __core_interrupt_handler_execution_limit_reached interupt does exactly what we want
+;; we can just delegate to that handler with an interrupt
+__internal_sleep:
+    int __core_interrupt_execution_limit_reached
+    ret

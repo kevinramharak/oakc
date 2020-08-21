@@ -19,7 +19,7 @@ __oak_prs:
     call __c_strlen             ; size_t length = strlen(loc)
     push A                      ;
     push B                      ;
-    ; __mar_comport_write(loc, length)
-    call __mar_comport_write
+    ; __internal_comport_write(loc, length)
+    call __internal_comport_write
     pop B
     ret

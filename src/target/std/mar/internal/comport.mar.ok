@@ -1,6 +1,6 @@
 
-#[if(!is_defined("MAR_COMPORT")) {
-    const MAR_COMPORT = 1;
+#[if(!is_defined("INTERNAL_COMPORT")) {
+    const INTERNAL_COMPORT = 1;
 
     #[extern("comport.mar")]
 }]

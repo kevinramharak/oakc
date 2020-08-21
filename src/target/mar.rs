@@ -13,6 +13,7 @@ use std::{
 
 use pathdiff::diff_paths;
 use asciicolor::Colorize;
+use parse_int;
 use crate::{parse,asm::AsmStatement, hir::{HirProgram, HirDeclaration}};
 
 pub struct MAR {
@@ -31,30 +32,99 @@ impl MAR {
     }
 
     fn link_asm(&self, asm: String) -> String {
-        let mut result = String::new();
+        let mut result: Vec<String> = Vec::new();
         let mut initializers: Vec<String> = Vec::new();
-        let flag = ";; %[runtime_initializer] ";
-        for line in asm.lines() {
-            if (line.starts_with(flag)) {
-                let slice: &str = &line[flag.len()..];
-                let initializer = String::from(slice);
-                initializers.push(initializer);
-            }
-        }
-        for line in asm.lines() {
-            if (line.contains(";; %[generate_initializers]")) {
-                result += &"    mov a, __core_initializer_vector_table_entries\n";
-                result += &"    add a, [__core_initializer_vector_table_length]\n";
-                result += &format!("    add [__core_initializer_vector_table_length], {}\n", initializers.len());
-                for initializer in &initializers {
-                    result += &format!("    mov [a], {}\n    inc a\n", initializer);
+        let mut destructors: Vec<String> = Vec::new();
+
+        // generates tables at the lines containing these flags, expect only 1 entry with the maximum size right after the flag seperated by a space
+        let generate_initializer_table_flag = ";; %[generate_initializer_table] ";
+        let generate_destructor_table_flag = ";; %[generate_destructor_table] ";
+        let mut initializer_table_index: usize = 0;
+        let mut initializer_table_size: usize = 0;
+        let mut destructor_table_index: usize = 0;
+        let mut destructor_table_size: usize = 0;
+
+        // registers lines starting with these flags as initializers/destructors. The function name should be following right after the flag seperated by a space
+        let initializer_flag = ";; %[runtime_initializer] ";
+        let destructor_flag = ";; %[runtime_destructor] ";
+
+        let mut iterator = asm.lines().enumerate();
+        while let Some((index, line)) = iterator.next() {
+            if line.contains(generate_initializer_table_flag) {
+                if initializer_table_index != 0 {
+                    panic!("cannot have 2 instances of the '{}' flag", generate_initializer_table_flag);
+                } else {
+                    initializer_table_index = index + 1;
+                    let slice = line.trim()[generate_initializer_table_flag.len()..].trim();
+                    if let Ok(table_size) = parse_int::parse::<usize>(slice) {
+                        initializer_table_size = table_size;
+                    } else {
+                        panic!("invalid initializer_table_size in '{}'", slice);
+                    }
+                    // discard the next line as it is the padding reserved for the table
+                    iterator.next();
                 }
-            } else {
-                result += &format!("{}\n", line);
+            } else if line.contains(generate_destructor_table_flag) {
+                if destructor_table_index != 0 {
+                    panic!("cannot have 2 instances of the '{}' flag", generate_destructor_table_flag);
+                } else {
+                    destructor_table_index = index + 1;
+                    let slice = line.trim()[generate_destructor_table_flag.len()..].trim();
+                    if let Ok(table_size) = parse_int::parse::<usize>(slice) {
+                        destructor_table_size = table_size;
+                    } else {
+                        panic!("invalid destructor_table_size in '{}'", slice);
+                    }
+                    // discard the next line as it is the padding reserved for the table
+                    iterator.next();
+                }
+            } else if line.contains(initializer_flag) {
+                let name = &line[initializer_flag.len()..];
+                initializers.push(String::from(name));
+            } else if line.contains(destructor_flag) {
+                let name = &line[destructor_flag.len()..];
+                destructors.push(String::from(name));
             }
+            // always want to insert the line to make it easier to debug
+            result.push(String::from(line));
         }
 
-        return result;
+        // generate intializer table
+        result.insert(initializer_table_index, format!("    __core_initializer_vector_table_length: dw {}", initializers.len()));
+        initializer_table_index += 1;
+        let initializers_length = initializers.len();
+        if initializers_length > 0 {
+            result.insert(initializer_table_index, String::from("    __core_initializer_vector_table_entries:"));
+            initializer_table_index += 1;
+            for initializer in initializers {
+                result.insert(initializer_table_index, format!("    dw {}", initializer));
+                initializer_table_index += 1;
+            }
+        }
+        let initializer_table_padding = initializer_table_size - initializers_length;
+        if (initializer_table_padding > 0) {
+            result.insert(initializer_table_index + 1, format!("    dw {} dup(0x0000);; remaining padding", initializer_table_padding));
+        }
+
+        // generate destructor table
+        result.insert(destructor_table_index, format!("    __core_destructor_vector_table_length: dw {}", destructors.len()));
+        destructor_table_index += 1;
+        let destructors_length = destructors.len();
+        if destructors_length > 0 {
+            result.insert(destructor_table_index, String::from("    __core_destructor_vector_table_entries:"));
+            destructor_table_index += 1;
+            for destructor in destructors {
+                result.insert(destructor_table_index, format!("    dw {}", destructor));
+                destructor_table_index += 1;
+            }
+        }
+        let destructor_table_padding = destructor_table_size - destructors_length;
+        if (destructor_table_padding > 0) {
+            result.insert(destructor_table_index + 1, format!("    dw {} dup(0x0000);; remaining padding", destructor_table_padding));
+        }
+
+        
+        return result.join("\n");
     }
 }
 
@@ -118,9 +188,9 @@ __core_main:")
     }
 
     fn end_entry_point(&self) -> String {
-        // technically we want to get the return value from main and return it to the hosting environment
-        // but since the target implementation is the host, we can do whatever we want here
+        // TODO: if main() is able to return a value we should handle it here
         String::from(r"
+    mov a, 0 ;; return 0 by default
     ret ;; return from entry point")
     }
 
@@ -251,7 +321,8 @@ __generated_end_while_{}:",
         // prefix the saved values as constants
         let mut asm = format!(r"
 __CORE_GLOBAL_SCOPE_SIZE equ {}
-__CORE_INIT_VM_CAPACITY equ {}",
+__CORE_INIT_VM_CAPACITY equ {}
+",
         self.global_scope_size.get(),
         self.init_vm_capacity.get()) + &code;
 

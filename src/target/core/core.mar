@@ -63,16 +63,20 @@ _0x0044:
     ;; TODO: figure out how the stdlib is going to reserve interrupts
     ;; probably by owning the software interrupt table and providing an interface to interact with it
 _0x0080:
-    __core_initializer_vector_table:
-    ;; NOTE: when altering the table, the padding after the struct has to be adjusted as well.
-    ;; struct __core_initializer_vector_table {
+    ;; NOTE: the following line generates a intializer vector table
+    ;; %[generate_initializer_table] 0x3c
+    dw 0, 0x3b dup(0xdead)
+    ;; struct {
     ;;   size_t length
-    __core_initializer_vector_table_length: dw 1
-    ;;   void * entries
-    __core_initializer_vector_table_entries: dw __core_machine_new
-    ;; }
-    ;; unused padding (0xdead is a value that is easily recognized)
-    __core_initializer_vector_table_padding: dw 0x76 dup(0xdead)
+    ;;   void * entries[length]
+    ;; } __core_initializer_vector_table;
+    ;; NOTE: the following line generates a destructor vector table
+    ;; %[generate_destructor_table] 0x3c
+    dw 0, 0x3b dup(0xdead)
+    ;; struct  {
+    ;;   size_t length
+    ;;   void * entries[length]
+    ;; } __core_destructor_vector_table;
 _0x00F8:
     ;; static variables used by __core_* functions
     ;; static struct machine {
@@ -97,7 +101,7 @@ _0x00F8:
     ;; static const char * __core_panic_stack_underflow
     __core_panic_stack_underflow: dw "\nERR_STACK_UNDERFLOW", 0 ;; 21 length
     ;; static void * __core_jump_on_wake
-    __core_jump_on_wake: dw __core_start_initialize_runtime ;; intial value is points to initialization, which makes the `jmp [__core_jump_on_wake]` a no-op
+    __core_jump_on_wake: dw __core_initial_jump_on_wake ;; intial value is points to initialization, which makes the `jmp [__core_jump_on_wake]` a no-op
     ;; static size_t __core_execution_limit_reached_saved_sp
     __core_execution_limit_reached_saved_sp: dw 0
     ;; static size_t __core_execution_limit_reached_saved_bp
@@ -204,6 +208,7 @@ __core_panic_scan:
     jz __core_panic_write
     jmp __core_panic_scan
 
+;; %[runtime_initializer] __core_machine_new
 ;; void __core_machine_new()
 ;; initializes the virtual machine located at the label __core_vm
 ;; we expected a label to be at the end of all code named `__core_heap_start`
@@ -639,31 +644,57 @@ __core_machine_divide:
     pop B
     ret
 
-;; execution on a server tick always starts at .text with the registers and status flags reset
-;; a server reset erase the memory and floppy contents
-;; #[entry] void __core_start()
-.text
-__core_start:
-    jmp [__core_jump_on_wake]
-
-    ;; setup a loop to call all intializer functions
-__core_start_initialize_runtime:
-    
-    ;; %[generate_initializers]
-
+;; void __core_init()
+;; will call all functions registered in the __core_initializer_vector_table
+;; the table itself is generated at compile time
+;; TODO: make it setup argc, argv and env
+__core_init:
     xor a, a                                          ; size_t i = 0
-__core_start_initialize_runtime_loop:
+__core_init_loop:
     cmp a, [__core_initializer_vector_table_length]   ; while (i != __core_initializer_vector_table_length)
-    jz __core_start_runtime_is_initialized
+    jz __core_init_return
     mov b, __core_initializer_vector_table_entries    ; void (*func)() = __core_initializer_vector_table_entries[i]
     add b, a
     call [b]                                            ; (*func)()
     inc a                                             ; i++
-    jmp __core_start_initialize_runtime_loop
+    jmp __core_init_loop
+__core_init_return:
+    ret
 
-__core_start_runtime_is_initialized:
+;; void __core_exit(int code)
+;; will call any registered destructors in the __core_destructor_vector_table
+;; the table itself is generated at compile time
+__core_exit:
+    xor a, a                                          ; size_t i = 0
+__core_exit_loop:
+    cmp a, [__core_destructor_vector_table_length]   ; while (i != __core_destructor_vector_table_length)
+    jz __core_exit_return
+    mov b, __core_destructor_vector_table_entries    ; void (*func)() = __core_destructor_vector_table_entries[i]
+    add b, a
+    call [b]                                            ; (*func)()
+    inc a                                             ; i++
+    jmp __core_exit_loop
+__core_exit_return:
+    ret 1
+
+;; #[entry] void __core_start()
+;; execution on a server tick always starts at .text with the registers and status flags reset
+;; a server reset will also reset the memory and floppy contents
+.text
+__core_start:
+    ;; jump to the location stored in __core_jump_on_wake
+    ;; default value will be the next instruction making this a no-op
+    jmp [__core_jump_on_wake]
+__core_initial_jump_on_wake:
+    ;; call runtime init
+    call __core_init
+
     ;; call the user defined enry point
     call __core_main
+
+    ;; call runtime exit, assuming __core_main left a return value in A
+    push a
+    call __core_exit
 
     ;; set the __core_jump_on_wake pointer to the next instruction
     ;; by using a simple pointer to represent a jump location if not null
@@ -673,4 +704,4 @@ __core_spin:
 __core_brk:
     brk
 
-;; oak code will be generated below
+;; oak compile will generate the user program (and stdlib if included) below

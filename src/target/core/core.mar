@@ -65,7 +65,8 @@ _0x0044:
 _0x0080:
     ;; NOTE: the following line generates a intializer vector table
     ;; %[generate_initializer_table] 0x3b
-    dw 1, __core_machine_new, 0x39 dup(0xdead) ;; this padding is just to preserve the correct memory layout. if a table is generated this line will be removed
+    __core_initializer_vector_table_length: dw 1 ;; this line is just to preserve a correct runtime if linking is turned off. if a table is generated this line should be removed
+    __core_initializer_vector_table_entries: dw __core_machine_new, 0x39 dup(0xdead) ;; this line is just to preserve a correct runtime if linking is turned off. if a table is generated this line should be removed
     ;; struct {
     ;;   size_t length
     ;;   void * entries[length]
@@ -73,7 +74,8 @@ _0x0080:
 _0x00BC:
     ;; NOTE: the following line generates a destructor vector table
     ;; %[generate_destructor_table] 0x3b
-    dw 0, 0x3a dup(0xdead) ;; this padding is just to preserve the correct memory layout. if a table is generated this line will be removed
+    __core_destructor_vector_table_length: dw 0 ;; this line is just to preserve a correct runtime if linking is turned off. if a table is generated this line should be removed
+    __core_destructor_vector_table_entries: dw 0x3a dup(0xdead) ;; this line is just to preserve a correct runtime if linking is turned off. if a table is generated this line should be removed
     ;; struct  {
     ;;   size_t length
     ;;   void * entries[length]

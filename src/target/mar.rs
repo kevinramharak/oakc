@@ -61,7 +61,8 @@ impl MAR {
                     } else {
                         panic!("invalid initializer_table_size in '{}'", slice);
                     }
-                    // discard the next line as it is the padding reserved for the table
+                    // discard the next  2 lines as it is the padding reserved for the table
+                    iterator.next();
                     iterator.next();
                 }
             } else if line.contains(generate_destructor_table_flag) {
@@ -75,7 +76,8 @@ impl MAR {
                     } else {
                         panic!("invalid destructor_table_size in '{}'", slice);
                     }
-                    // discard the next line as it is the padding reserved for the table
+                    // discard the next 2 lines as it is the padding reserved for the table
+                    iterator.next();
                     iterator.next();
                 }
             } else if line.contains(initializer_flag) {

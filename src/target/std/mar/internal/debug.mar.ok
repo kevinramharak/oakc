@@ -1,0 +1,6 @@
+
+#[if(!is_defined("INTERNAL_DEBUG")) {
+    const INTERNAL_DEBUG = 1;
+
+    #[extern("debug.mar")]
+}]

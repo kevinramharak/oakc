@@ -1,0 +1,34 @@
+#[std]
+
+#[include("../../src/target/std/mar/internal/debug.mar.ok")]
+
+fn main() {
+    let text = "Hello World!";
+    let length = C::strlen(text);
+
+    // C::memchr
+    let haystack: &void = text as &void;
+    let needle: char = 'o';
+    let occurence: &void = C::memchr(haystack, needle, length);
+    let index: num = (occurence as num) - (haystack as num);
+    putstr("the first occurence of '"); putchar(needle); putstr("' in the string '"); putstr(text); putstr("' is at index "); putnumln(index);
+    
+    // C::memcmp
+    let lhs = "abcd";
+    let rhs = "abcD";
+    let result = C::memcmp(lhs, rhs, 4);
+    if result > 0 {
+        putchar('\''); putstr(lhs); putchar('\''); putstr(" is greater than '"); putstr(rhs); putcharln('\'');
+    } else if result < 0 {
+        putchar('\''); putstr(lhs); putchar('\''); putstr(" is lesser than '"); putstr(rhs); putcharln('\'');
+    } else {
+        putchar('\''); putstr(lhs); putchar('\''); putstr(" is equal to '"); putstr(rhs); putcharln('\'');
+    }
+
+    // C::memcpy
+    let copy_dest = "00000";
+    let copy_src = "01234";
+
+    // C::strlen
+    putstr("the string '"); putstr(text); putstr("' is "); putnum(length); putstrln(" characters long");
+}

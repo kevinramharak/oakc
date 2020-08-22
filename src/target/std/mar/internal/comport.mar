@@ -51,6 +51,7 @@ __internal_comport_write_return:
     pop b
     ret 2
 
+;; %[runtime_destructor] __internal_comport_flush
 ;; size_t flush()
 ;; flushes the buffered `write()` calls to the internal buffer
 ;; returns the amount of characters written to the internal buffer
@@ -121,22 +122,13 @@ __internal_comport_runtime_initializer:
     mov [__core_interrupt_execution_limit_reached], __internal_comport_interrupt_handler_execution_limit_reached
     ret
 
-
-;; %[runtime_destructor] __internal_comport_runtime_destructor
-;; this destructor preserves A then calls comport flush to make sure the buffer it flushed before execution is halted
-__internal_comport_runtime_destructor:
-    push a
-    call __internal_comport_flush
-    pop a
-    ret
-
 ;; static void * __internal_comport_interrupt_handler_execution_limit_reached_old_handler
 __internal_comport_interrupt_handler_execution_limit_reached_old_handler: dw 0
 
 ;; #[interrupt_handler] void __internal_comport_interrupt_handler_execution_limit_reached:
 ;; this handler flushes the comport and then jumps to the original handler
 __internal_comport_interrupt_handler_execution_limit_reached:
-    push a ;; preserve a since the original handler cares wants to preserve its handler
+    push a ;; preserve a
     call __internal_comport_flush
     pop a
     jmp [__internal_comport_interrupt_handler_execution_limit_reached_old_handler]

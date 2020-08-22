@@ -668,14 +668,15 @@ __core_init_return:
 ;; will call any registered destructors in the __core_destructor_vector_table
 ;; the table itself is generated at compile time
 __core_exit:
-    xor a, a                                          ; size_t i = 0
+    ;; [SP + 1] = int code
+    xor c, c                                          ; size_t i = 0
 __core_exit_loop:
-    cmp a, [__core_destructor_vector_table_length]   ; while (i != __core_destructor_vector_table_length)
+    cmp c, [__core_destructor_vector_table_length]   ; while (i != __core_destructor_vector_table_length)
     jz __core_exit_return
     mov b, __core_destructor_vector_table_entries    ; void (*func)() = __core_destructor_vector_table_entries[i]
-    add b, a
+    add b, c
     call [b]                                            ; (*func)()
-    inc a                                             ; i++
+    inc c                                             ; i++
     jmp __core_exit_loop
 __core_exit_return:
     ret 1

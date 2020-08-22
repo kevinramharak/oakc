@@ -44,12 +44,11 @@ The implementation of the oak stdlib.
 - finish https://github.com/simon987/Much-Assembly-Required/pull/205
 - use setcc instructions in core/std
 - document/implement lea instructions on github
-- make sure the calling convention is honored
-- implement a linking phase so std can hook into the runtime initialize phase
+- optimize instruction count using `sub sp, size` instead of pushing/popping multiple registers
 - implement basic stuff of stdlib
 - implement threading/coroutine library with setjmp/longjmp, also with stacks saved into the floppy disk?
 - implement filesystem
 - implement kernel
 - implement shell
-- generate oak program as if its a `main` executable in cwd when opening the shell? idno gets weird
+- setup some idea of argc, argv, env
 - draw out the architecture/memory layout

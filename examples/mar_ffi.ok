@@ -1,7 +1,0 @@
-#[std]
-
-fn main() {
-    let string = "Hello World!";
-    let length = C::strlen(string);
-    putnumln(length);
-}

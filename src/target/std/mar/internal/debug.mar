@@ -1,0 +1,6 @@
+
+;; void __internal_debugger()
+;; helper function to add breakpoints to oak code
+__internal_debugger:
+    int 3
+    ret

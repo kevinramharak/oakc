@@ -8,24 +8,92 @@
 
 __C_NULL equ 0x0000
 
-;; void * memccpy(void *, const void *, int, size_t);
-__c_memccpy:
-    mov a, __C_NULL
-    ret 3
-
-;; void * memchr(const void *, int, size_t);
+;; void * memchr (const void * haystack, int needle, size_t length);
 __c_memchr:
-    mov a, __C_NULL
+    push bp
+    mov bp, sp
+
+    ;; [BP] = bp
+    ;; [BP + 1] = return address
+    ;; [BP + 2] = const void * haystack
+    ;; [BP + 3] = int needle
+    ;; [BP + 4] = size_t length
+    mov a, [BP + 2]
+__c_memchr_loop:
+    cmp [BP + 4], 0
+    jz __c_memchr_return_null
+    cmp [a], [BP + 3]
+    jz __c_memchr_return
+    inc a
+    dec [BP + 4]
+    jmp __c_memchr_loop
+__c_memchr_return_null:
+    xor a, a
+__c_memchr_return:
+    mov sp, bp
+    pop bp
     ret 3
 
-;; int memcmp(const void *, const void *, size_t);
+;; int memcmp(const void * lhs, const void * rhs, size_t length);
 __c_memcmp:
-    mov a, __C_NULL
+    push b
+    push c
+    push bp
+    mov bp, sp
+
+    ;; [BP] = bp
+    ;; [BP + 1] = c
+    ;; [BP + 2] = b
+    ;; [BP + 3] = return address
+    ;; [BP + 4] = const void * lhs
+    ;; [BP + 5] = const void * rhs
+    ;; [BP + 6] = size_t length
+    mov b, [BP + 4]
+    mov c, [BP + 5]
+    xor a, a
+__c_memcmp_loop:
+    cmp [bp + 6], 0
+    jz __c_memcmp_return
+    mov a, [c]
+    sub a, [b]
+    jnz __c_memcmp_return
+    inc b
+    inc c
+    dec [BP + 6]
+    jmp __c_memcmp_loop
+__c_memcmp_return:
+    mov sp, bp
+    pop bp
+    pop c
+    pop b
     ret 3
 
-;; void * memcpy(void *, const void *, size_t);
+;; void * memcpy(void * destination, const void * source, size_t length);
 __c_memcpy:
-    mov a, __C_NULL
+    push b
+    push bp
+    mov bp, sp
+    
+    ;; [BP] = bp
+    ;; [BP + 1] = b
+    ;; [BP + 2] = return value
+    ;; [BP + 3] = void * destination
+    ;; [BP + 4] = void * source
+    ;; [BP + 5] = size_t length
+    mov a, [BP + 3]
+    mov b, [BP + 4]
+__c_memcpy_loop:
+    cmp [BP + 5], 0
+    jz __c_memcpy_return
+    mov [a], [b]
+    inc a
+    inc b
+    dec [BP + 5]
+
+__c_memcpy_return:
+    mov a, [BP + 3]
+    mov sp, bp
+    pop bp
     ret 3
 
 ;; void *memmove(void *, const void *, size_t);

@@ -15,54 +15,31 @@
     #[extern("string.h.mar")]
 
     // define ffi
-
-    #[doc("Copies up to `length` amount of words or until encountering `c` from the location pointed to by `source` to the memory location pointed to by `destination`.")]
-    fn C::memccpy(destination: &void, source: &void, c: char, length: num) -> &void {
-            // __ffi_pass_arg_by_value!(length);
-            // __ffi_pass_arg_by_value!(c);
-            // __ffi_pass_arg_by_reference!(source);
-            // __ffi_pass_arg_by_reference!(destination);
-            // __c_memccpy!();
-            // return __ffi_pass_return_value!() as &void;
-            for (let i = 0; i < length; i += 1) {
-                (destination as &char)[i] = (source as &char)[i];
-                if ((destination as &char)[i] == c) {
-                    // TODO: replace with a break statement
-                    i = length;
-                }
-            }
-            return destination;
-    }
-
     #[doc("Finds the first occurence of `needle` in `haystack` up till `length` amount of words. Returns a pointer to the found `needle` location or `NULL` if not found.")]
     fn C::memchr(haystack: &void, needle: char, length: num) -> &void {
-        let val: &void = NULL as &void;
-        for (let i = 0; i < length; i += 1) {
-            if ((haystack as &char)[i] == needle) {
-                // TODO: replace with a return
-                val = (haystack + i) as &void;
-                i = length;
-            }
-        }
-        return val;
+        __ffi_pass_arg_by_value!(length);
+        __ffi_pass_arg_by_value!(needle);
+        __ffi_pass_arg_by_reference!(haystack);
+        __c_memchr!();
+        return __ffi_pass_return_value_as_reference!() as &void;
     }
 
-    #[doc("")]
+    #[doc("Compares the first `length` amount of words of the block of memory pointed to by `lhs` to the bytes pointed by `rhs`, returning zero if they all match, above zero if `lhs` ")]
     fn C::memcmp(lhs: &void, rhs: &void, length: num) -> num {
-        return NULL;
+        __ffi_pass_arg_by_value!(length);
+        __ffi_pass_arg_by_reference!(rhs);
+        __ffi_pass_arg_by_reference!(lhs);
+        __c_memcmp!();
+        return __ffi_pass_return_value_as_value!() as num;
     }
 
     #[doc("Copies `length` amount of words from the location pointed to by `source` to the memory location pointed to by `destination`.")]
     fn C::memcpy(destination: &void, source: &void, length: num) -> &void {
-            // __ffi_pass_arg_by_value!(length);
-            // __ffi_pass_arg_by_reference!(source);
-            // __ffi_pass_arg_by_reference!(destination);
-            // __c_memccpy!();
-            // return __ffi_pass_return_value!() as &void;
-            for (let i = 0; i < length; i += 1) {
-                (destination as &num)[i] = (source as &num)[i];
-            }
-            return destination;
+            __ffi_pass_arg_by_value!(length);
+            __ffi_pass_arg_by_reference!(source);
+            __ffi_pass_arg_by_reference!(destination);
+            __c_memccpy!();
+            return __ffi_pass_return_value!() as &void;
     }
 
     #[doc("Copies `length` amount of words from the location pointed by `source` to the location pointed to by `destination`. Copying takes place as if an intermediate buffer were used, allowing the `destination` and `source` to overlap.")]
@@ -102,7 +79,7 @@
     fn C::strlen(string: &char) -> num {
         __ffi_pass_arg_by_reference!(string as &void);
         __c_strlen!();
-        return __ffi_pass_return_value!() as num;
+        return __ffi_pass_return_value_as_value!() as num;
     }
 
     fn C::strncat() {

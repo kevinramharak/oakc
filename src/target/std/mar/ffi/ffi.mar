@@ -17,7 +17,14 @@ __ffi_pass_arg_by_reference:
     ret                        ;; return from caller
 
 ;; wraps the mar return value (in A) to the vm stack
-__ffi_pass_return_value:
+__ffi_pass_return_value_as_value:
+    push a
+    call __core_machine_push
+    ret
+
+;; wraps the mar return value (in A) as reference to the vm stack
+__ffi_pass_return_value_as_reference:
+    sub a, [__core_vm_memory]
     push a
     call __core_machine_push
     ret

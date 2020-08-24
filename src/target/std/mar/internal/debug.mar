@@ -1,3 +1,7 @@
+;;/
+;; This file defines 2 functions to interact with the client side debugger
+;; void __internal_debugger();
+;;/
 
 ;; void __internal_debugger()
 ;; helper function to add breakpoints to oak code

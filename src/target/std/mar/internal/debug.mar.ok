@@ -1,6 +1,13 @@
 
 #[if(!is_defined("INTERNAL_DEBUG")) {
+    // include guard
     const INTERNAL_DEBUG = 1;
 
+    // assembly implementation
     #[extern("debug.mar")]
+
+    // ffi
+    fn Internal::debugger() {
+        __internal_debugger!();
+    }
 }]

@@ -1,4 +1,10 @@
-;; it doesnt actually wrap, it just knows about the different abi's and makes them communicate
+;;/
+;; This file defines functions to act like a intermediate between the Oak vm and the MAR stack
+;; void __ffi_pass_arg_by_value(int value)
+;; void __ffi_pass_arg_by_reference(void * pointer)
+;; void __ffi_pass_return_value_by_value(int value)
+;; void __ffi_pass_return_value_by_reference(void * pointer)
+;;/
 
 __ffi_pass_arg_by_value:
     pop b                      ;; save return address

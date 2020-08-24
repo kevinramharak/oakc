@@ -1,0 +1,20 @@
+;;/
+;; This file defines functions to address memory from oak code
+;;/
+
+;; void __internal_set_address(int address, int value)
+__internal_set_address:
+    ;; [SP] = return address
+    ;; [SP + 1] = int address
+    ;; [SP + 2] = int value
+    mov a, [SP + 1]
+    mov [a], [SP + 2]
+    ret 2
+
+;; int __internal_get_address(int address)
+__internal_get_address:
+    ;; [SP] = return address
+    ;; [SP + 1] int address
+    mov a, [SP + 1]
+    mov a, [a]
+    ret 1

@@ -1,7 +1,5 @@
 #[std]
 
-#[include("../../src/target/std/mar/internal/debug.mar.ok")]
-
 fn main() {
     let text = "Hello World!";
     let length = C::strlen(text);
@@ -28,6 +26,7 @@ fn main() {
     // C::memcpy
     let copy_dest = "00000";
     let copy_src = "01234";
+    C::memcpy(copy_dest, copy_src, 5);
 
     // C::strlen
     putstr("the string '"); putstr(text); putstr("' is "); putnum(length); putstrln(" characters long");

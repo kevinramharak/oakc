@@ -24,7 +24,7 @@
         return __ffi_pass_return_value_as_reference!() as &void;
     }
 
-    #[doc("Compares the first `length` amount of words of the block of memory pointed to by `lhs` to the bytes pointed by `rhs`, returning zero if they all match, above zero if `lhs` ")]
+    #[doc("Compares the first `length` amount of words of the block of memory pointed to by `lhs` to the bytes pointed by `rhs`, returning zero if they all match, above zero if `lhs` is bigger, below zero if `rhs` is bigger")]
     fn C::memcmp(lhs: &void, rhs: &void, length: num) -> num {
         __ffi_pass_arg_by_value!(length);
         __ffi_pass_arg_by_reference!(rhs);
@@ -38,8 +38,8 @@
             __ffi_pass_arg_by_value!(length);
             __ffi_pass_arg_by_reference!(source);
             __ffi_pass_arg_by_reference!(destination);
-            __c_memccpy!();
-            return __ffi_pass_return_value!() as &void;
+            __c_memcpy!();
+            return __ffi_pass_return_value_as_value!() as &void;
     }
 
     #[doc("Copies `length` amount of words from the location pointed by `source` to the location pointed to by `destination`. Copying takes place as if an intermediate buffer were used, allowing the `destination` and `source` to overlap.")]

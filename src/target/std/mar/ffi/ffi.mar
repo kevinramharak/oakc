@@ -30,7 +30,10 @@ __ffi_pass_return_value_as_value:
 
 ;; wraps the mar return value (in A) as reference to the vm stack
 __ffi_pass_return_value_as_reference:
+    cmp a, 0
+    jz __ffi_pass_return_value_as_reference_after_null_check
     sub a, [__core_vm_memory]
+__ffi_pass_return_value_as_reference_after_null_check:
     push a
     call __core_machine_push
     ret

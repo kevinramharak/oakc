@@ -52,3 +52,9 @@ The implementation of the oak stdlib.
 - implement shell
 - setup some idea of argc, argv, env
 - draw out the architecture/memory layout
+- do not auto include `C::$ffi` functions as they have an impact on the size of the program
+- write tooling like:
+  + assembly optimizer
+  + oak optimizer
+  + auto generate `.ok` ffi files
+- figure out errno (http://www.cplusplus.com/reference/system_error/errc/)

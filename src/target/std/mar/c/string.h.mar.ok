@@ -39,32 +39,56 @@
             __ffi_pass_arg_by_reference!(source);
             __ffi_pass_arg_by_reference!(destination);
             __c_memcpy!();
-            return __ffi_pass_return_value_as_value!() as &void;
+            return __ffi_pass_return_value_as_reference!() as &void;
     }
 
     #[doc("Copies `length` amount of words from the location pointed by `source` to the location pointed to by `destination`. Copying takes place as if an intermediate buffer were used, allowing the `destination` and `source` to overlap.")]
     fn C::memmove(destination: &void, source: &void, length: num) -> &void {
-        return NULL as &void;
+        __ffi_pass_arg_by_value!(length);
+        __ffi_pass_arg_by_reference!(source);
+        __ffi_pass_arg_by_reference!(destination);
+        __c_memmove!();
+        return __ffi_pass_return_value_as_reference!() as &void;
     }
 
-    fn C::memset() {
-
+    #[doc("Sets `length` amount of words at location `destination` to the value of `value`.")]
+    fn C::memset(destination: &void, value: num, length: num) -> &void {
+        __ffi_pass_arg_by_value!(length);
+        __ffi_pass_arg_by_value!(value);
+        __ffi_pass_arg_by_reference!(destination);
+        __c_memset!();
+        return __ffi_pass_return_value_as_reference!() as &void;
     }
 
-    fn C::strcat() {
-
+    #[doc("Concats `source` at the end of `destination`.")]
+    fn C::strcat(destination: &char, source: &char) -> &char {
+        __ffi_pass_arg_by_reference!(source);
+        __ffi_pass_arg_by_reference!(destination);
+        __c_strcat!();
+        return __ffi_pass_return_value_as_reference!() as &char;
     }
 
-    fn C::strchr() {
-
+    #[doc("Finds the first occurence of `needle` in `haystack`. Returns a pointer to the found `needle` location or `NULL` if not found.")]
+    fn C::strchr(haystack: &char, needle: char) -> &char {
+        __ffi_pass_arg_by_value!(needle);
+        __ffi_pass_arg_by_reference!(haystack);
+        __c_strchr!();
+        return __ffi_pass_return_value_as_reference!() as &char;
     }
 
-    fn C::strcmp() {
-
+    #[doc("Compares `lhs` with `rhs`, returning zero if all characters match, above zero if `lhs` is bigger, below zero if `rhs` is bigger")]
+    fn C::strcmp(lhs: &char, rhs: &char) -> num {
+        __ffi_pass_arg_by_reference!(rhs);
+        __ffi_pass_arg_by_reference!(lhs);
+        __c_strcmp!();
+        return __ffi_pass_return_value_as_value!() as num;
     }
 
-    fn C::strcpy() {
-
+    fn C::strcpy(destination: &char, source: &char) -> &char {
+        __ffi_pass_arg_by_reference!(source);
+        __ffi_pass_arg_by_reference!(destination);
+        __c_strcpy!();
+        return __ffi_pass_return_value_as_reference!() as &char;
     }
 
     fn C::strcspn() {

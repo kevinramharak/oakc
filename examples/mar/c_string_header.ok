@@ -1,33 +1,117 @@
 #[std]
+#[memory(2048)]
 
-fn main() {
-    let text = "Hello World!";
-    let length = C::strlen(text);
+fn assert_condition(test: bool, message: &char) {
+    if (!test) {
+        putstr("assert failed: expected "); putbool(test); putstrln(" == true");
+        putstr("               "); putstrln(message);
+    }
+}
 
-    // C::memchr
-    let haystack: &void = text as &void;
+fn assert_equal_num(lhs: num, rhs: num, message: &char) {
+    if (lhs != rhs) {
+        putstr("assert failed: expected"); putnum(lhs); putstr(" == "); putnumln(rhs);
+        putstr("               "); putstrln(message);
+    }
+}
+
+fn assert_greater_num(lhs: num, rhs: num, message: &char) {
+    if (lhs > rhs) {
+        putstr("assert failed: expected"); putnum(lhs); putstr(" > "); putnumln(rhs);
+        putstr("               "); putstrln(message);
+    }
+}
+
+fn assert_lower_num(lhs: num, rhs: num, message: &char) {
+    if (lhs < rhs) {
+        putstr("assert failed: expected"); putnum(lhs); putstr(" < "); putnumln(rhs);
+        putstr("               "); putstrln(message);
+    }
+}
+
+fn assert_equal_str(lhs: &char, rhs: &char, message: &char) {
+    let lhs_length = C::strlen(lhs);
+    let rhs_length = C::strlen(rhs);
+    let min_length = lhs_length < rhs_length ? lhs_length : rhs_length;
+    if (C::memcmp(lhs, rhs, min_length) != 0) {
+        putstr("assert failed: expected '"); putstr(lhs); putstr("' == '"); putstr(rhs); putcharln('\'');
+        putstr("               "); putstrln(message);
+    }
+}
+
+fn assert_not_equal_str(lhs: &char, rhs: &char, message: &char) {
+    let lhs_length = C::strlen(lhs);
+    let rhs_length = C::strlen(rhs);
+    let min_length = lhs_length < rhs_length ? lhs_length : rhs_length;
+    if (C::memcmp(lhs, rhs, min_length) == 0) {
+        putstr("assert failed: expected '"); putstr(lhs); putstr("' == '"); putstr(rhs); putcharln('\'');
+        putstr("               "); putstrln(message);
+    }
+}
+
+fn test_memchr() {
+    let haystack: &void = "The fox jumps over the hedge";
     let needle: char = 'o';
+    let length = C::strlen(haystack);
     let occurence: &void = C::memchr(haystack, needle, length);
     let index: num = (occurence as num) - (haystack as num);
-    putstr("the first occurence of '"); putchar(needle); putstr("' in the string '"); putstr(text); putstr("' is at index "); putnumln(index);
-    
-    // C::memcmp
+    assert_equal_num(index, 5, "test_memchr: expected `index` to equal 5");
+}
+
+fn test_memcmp() {
     let lhs = "abcd";
     let rhs = "abcD";
     let result = C::memcmp(lhs, rhs, 4);
-    if result > 0 {
-        putchar('\''); putstr(lhs); putchar('\''); putstr(" is greater than '"); putstr(rhs); putcharln('\'');
-    } else if result < 0 {
-        putchar('\''); putstr(lhs); putchar('\''); putstr(" is lesser than '"); putstr(rhs); putcharln('\'');
-    } else {
-        putchar('\''); putstr(lhs); putchar('\''); putstr(" is equal to '"); putstr(rhs); putcharln('\'');
-    }
+    assert_condition(result < 0, "test_memcmp: expected `rhs` to be lower than `lhs`");
+}
 
-    // C::memcpy
-    let copy_dest = "00000";
-    let copy_src = "01234";
-    C::memcpy(copy_dest, copy_src, 5);
+fn test_memcpy() {
+    let dest = "00000";
+    let src = "01234";
+    assert_not_equal_str(dest, src, "expected `dest` to not str_equal to `src`");
+    let _: &void = C::memcpy(dest, src, 5);
+    assert_equal_str(dest, src, "test_memcpy: expected `dest` to str_equal to `src`");
+}
 
-    // C::strlen
-    putstr("the string '"); putstr(text); putstr("' is "); putnum(length); putstrln(" characters long");
+fn test_memmove() {
+    let dest = "0000111";
+    let src = dest + 4;
+    let _: &void = C::memmove(dest, src, 3);
+    assert_equal_str(dest, "1110111", "test_memmove: expected `dest` to str_equal to `src`");
+}
+
+fn test_memset() {
+    let dest = "00000";
+    let _: &void = C::memset(dest, '1' as num, 3);
+    assert_equal_str(dest, "11100", "test_memset: expected `dest` to str_equal to `src`");
+}
+
+fn test_strlen() {
+    let text = "Hi There!";
+    let length = C::strlen(text);
+    assert_equal_num(length, 9, "test_strlen: expected `length` to be equal to 9");
+}
+
+fn test_strcat() {
+    let str = alloc(13) as &char;
+    let _ = C::strcat(str, "Hello ");
+    _ = C::strcat(str, "World!");
+    assert_equal_str(str, "Hello World!", "expected `C::strcat` to work correctly");
+}
+
+#[include("../../src/target/std/mar/internal/debug.mar.ok")]
+
+fn main() {
+    // memory
+    test_memchr();
+    test_memcmp();
+    test_memcpy();
+    test_memmove();
+    test_memset();
+
+    // strings
+    test_strcat();
+    test_strlen();
+
+    putstrln("If nothing printed all tests ran succesful");
 }

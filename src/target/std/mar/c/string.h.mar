@@ -1,7 +1,5 @@
 ;;/
 ;; Implements the C header 'string.h' file in MAR assembly
-;; NOTE: all functions and variables are prefixed with `__c_`
-;; NOTE: all constants are prefixed with `__C_`
 ;; Source: https://pubs.opengroup.org/onlinepubs/007908799/xsh/string.h.html
 ;;         http://www.cplusplus.com/reference/cstring/
 ;;/
@@ -10,60 +8,46 @@ __C_NULL equ 0x0000
 
 ;; void * memchr (const void * haystack, int needle, size_t length);
 __c_memchr:
-    push bp
-    mov bp, sp
-
-    ;; [BP] = bp
-    ;; [BP + 1] = return address
-    ;; [BP + 2] = const void * haystack
-    ;; [BP + 3] = int needle
-    ;; [BP + 4] = size_t length
-    mov a, [BP + 2]
+    ;; [SP + 1] = const void * haystack
+    ;; [SP + 2] = int needle
+    ;; [SP + 3] = size_t length
+    mov a, [SP + 1]
 __c_memchr_loop:
-    cmp [BP + 4], 0
+    cmp [SP + 3], 0
     jz __c_memchr_return_null
-    cmp [a], [BP + 3]
+    cmp [a], [SP + 2]
     jz __c_memchr_return
     inc a
-    dec [BP + 4]
+    dec [SP + 3]
     jmp __c_memchr_loop
 __c_memchr_return_null:
     xor a, a
 __c_memchr_return:
-    mov sp, bp
-    pop bp
     ret 3
 
 ;; int memcmp(const void * lhs, const void * rhs, size_t length);
 __c_memcmp:
     push b
     push c
-    push bp
-    mov bp, sp
 
-    ;; [BP] = bp
-    ;; [BP + 1] = c
-    ;; [BP + 2] = b
-    ;; [BP + 3] = return address
-    ;; [BP + 4] = const void * lhs
-    ;; [BP + 5] = const void * rhs
-    ;; [BP + 6] = size_t length
-    mov b, [BP + 4]
-    mov c, [BP + 5]
+    ;; [SP + 2] = return address
+    ;; [SP + 3] = const void * lhs
+    ;; [SP + 4] = const void * rhs
+    ;; [SP + 5] = size_t length
+    mov b, [SP + 3]
+    mov c, [SP + 4]
     xor a, a
 __c_memcmp_loop:
-    cmp [bp + 6], 0
+    cmp [SP + 5], 0
     jz __c_memcmp_return
     mov a, [c]
     sub a, [b]
     jnz __c_memcmp_return
     inc b
     inc c
-    dec [BP + 6]
+    dec [SP + 5]
     jmp __c_memcmp_loop
 __c_memcmp_return:
-    mov sp, bp
-    pop bp
     pop c
     pop b
     ret 3
@@ -71,57 +55,145 @@ __c_memcmp_return:
 ;; void * memcpy(void * destination, const void * source, size_t length);
 __c_memcpy:
     push b
-    push bp
-    mov bp, sp
-    
-    ;; [BP] = bp
-    ;; [BP + 1] = b
-    ;; [BP + 2] = return value
-    ;; [BP + 3] = void * destination
-    ;; [BP + 4] = void * source
-    ;; [BP + 5] = size_t length
-    mov a, [BP + 3]
-    mov b, [BP + 4]
+    ;; [SP + 1] = return value
+    ;; [SP + 2] = void * destination
+    ;; [SP + 3] = void * source
+    ;; [SP + 4] = size_t length
+    mov a, [SP + 2]
+    mov b, [SP + 3]
 __c_memcpy_loop:
-    cmp [BP + 5], 0
+    cmp [SP + 4], 0
     jz __c_memcpy_return
     mov [a], [b]
     inc a
     inc b
-    dec [BP + 5]
-
+    dec [SP + 4]
+    jmp __c_memcpy_loop
 __c_memcpy_return:
-    mov a, [BP + 3]
-    mov sp, bp
-    pop bp
+    mov a, [SP + 2]
+    pop b
     ret 3
 
-;; void *memmove(void *, const void *, size_t);
+;; void * memmove(void * destination, const void * source, size_t length);
 __c_memmove:
-    mov a, __C_NULL
+    push b
+    ;; [SP + 2] void * destination
+    ;; [SP + 3] void * source
+    ;; [SP + 4] size_t length
+    mov a, [SP + 2]
+    mov b, [SP + 3]
+    cmp b, a
+    jz __c_memmove_return
+    jg __c_memmove_loop
+    ;; if source < dest copy backwards
+    add a, [SP + 4]
+    add b, [SP + 4]
+__c_memmove_loop:
+    cmp [SP + 4], 0
+    jz __c_memmove_return
+    mov [a], [b]
+    inc a
+    inc b
+    dec [SP + 4]
+    jmp __c_memmove_loop
+__c_memmove_loop_backwards:
+    cmp [SP + 4], 0
+    jz __c_memmove_return
+    mov [a], [b]
+    dec a
+    dec b
+    dec [SP + 4]
+    jmp __c_memmove_loop_backwards
+__c_memmove_return:
+    mov a, [SP + 2]
+    pop b
     ret 3
 
-;; void * memset(void *, int, size_t);
+;; void * memset(void * destination, int value, size_t length);
 __c_memset:
-    mov a, __C_NULL
-    ret 2
+    ;; [SP + 1] void * destination
+    ;; [SP + 2] int value
+    ;; [SP + 3] size_t length
+    mov a, [SP + 1]
+__c_memset_loop:
+    cmp [SP + 3], 0
+    jz __c_memset_return
+    mov [a], [SP + 2]
+    inc a
+    dec [SP + 3]
+    jmp __c_memset_loop
+__c_memset_return:
+    mov a, [SP + 1]
+    ret 3
 
-;; char * strcat(char *, const char *);
+;; char * strcat(char * destination, const char * source);
 __c_strcat:
-    mov a, __C_NULL
+    push b
+    mov a, [SP + 2]
+    mov b, [SP + 3]
+__c_strcat_loop_to_end_of_destination:
+    cmp [a], 0
+    jz __c_strcat_loop
+    inc a
+    jmp __c_strcat_loop_to_end_of_destination
+__c_strcat_loop:
+    cmp [b], 0
+    jz __c_strcat_return
+    mov [a], [b]
+    inc a
+    inc b
+    jmp __c_strcat_loop
+__c_strcat_return:
+    mov [a], 0
+    mov a, [SP + 2]
+    pop b
     ret 2
 
-;; char * strchr(const char *, int);
+;; char * strchr(const char * haystack, int needle);
 __c_strchr:
-    mov a, __C_NULL
+    ;; [SP + 1] = const void * haystack
+    ;; [SP + 2] = int needle
+    mov a, [SP + 1]
+__c_strchr_loop:
+    cmp [a], 0
+    jz __c_strchr_return_null
+    cmp [a], [SP + 2]
+    jz __c_strchr_return
+    inc a
+    jmp __c_strchr_loop
+__c_strchr_return_null:
+    xor a, a
+__c_strchr_return:
     ret 2
 
-;; int strcmp(const char *, const char *);
+;; int strcmp(const char * lhs, const char * rhs);
 __c_strcmp:
-    mov a, __C_NULL
+    push b
+    push c
+    ;; [SP + 2] = return address
+    ;; [SP + 3] = const void * lhs
+    ;; [SP + 4] = const void * rhs
+    mov b, [SP + 3]
+    mov c, [SP + 4]
+    xor a, a
+__c_strcmp_loop:
+    cmp [b], 0
+    jz __c_strcmp_return
+    cmp [c], 0
+    jz __c_strcmp_return
+    mov a, [c]
+    sub a, [b]
+    jnz __c_strcmp_return
+    inc b
+    inc c
+    dec [SP + 5]
+    jmp __c_strcmp_loop
+__c_strcmp_return:
+    pop c
+    pop b
     ret 2
 
-;; char * strcpy(char *, const char *);
+;; char * strcpy(char * destination, const char * source);
 __c_strcpy:
     mov a, __C_NULL
     ret 2

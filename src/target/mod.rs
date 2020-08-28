@@ -12,6 +12,7 @@ use super::hir::{HirConstant, HirProgram};
 
 pub trait Target {
     fn get_name(&self) -> char;
+    fn is_standard(&self) -> bool;
 
     fn extend_hir(&self, cwd: &PathBuf, hir: &mut HirProgram) {}
 

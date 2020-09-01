@@ -271,7 +271,6 @@ __core_machine_establish_stack_frame_preserve_args_break:
     ;; when this function returns, it will be able to resume
     ;; the current stack frame
     call __core_machine_load_base_ptr
-
     ;; Set the base pointer to the current stack pointer to 
     ;; begin the stack frame at the current position on the stack.
     mov [__core_vm_base_ptr], [__core_vm_stack_ptr]

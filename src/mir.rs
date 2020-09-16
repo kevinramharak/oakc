@@ -2120,7 +2120,9 @@ impl MirExpression {
 impl Display for MirExpression {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         match self {
-            Self::Conditional(cond, then, otherwise) => write!(f, "{} ? {} : {}", cond, then, otherwise),
+            Self::Conditional(cond, then, otherwise) => {
+                write!(f, "{} ? {} : {}", cond, then, otherwise)
+            }
             Self::Move(expr) => write!(f, "move({})", expr),
 
             Self::True => write!(f, "true"),
@@ -2133,7 +2135,7 @@ impl Display for MirExpression {
 
             Self::Add(lhs, rhs) => write!(f, "{}+{}", lhs, rhs),
             Self::Subtract(lhs, rhs) => write!(f, "{}-{}", lhs, rhs),
-            Self::Multiply(lhs, rhs) => write!(f, "{}/{}", lhs, rhs),
+            Self::Multiply(lhs, rhs) => write!(f, "{}*{}", lhs, rhs),
             Self::Divide(lhs, rhs) => write!(f, "{}/{}", lhs, rhs),
 
             Self::Equal(lhs, rhs) => write!(f, "{}=={}", lhs, rhs),

@@ -7,7 +7,5 @@
     #[extern("debug.mar")]
 
     // ffi
-    fn Internal::debugger() {
-        __internal_debugger!();
-    }
+    extern fn __internal_debugger as Internal::debugger();
 }]

@@ -14,7 +14,7 @@ use std::{
 use pathdiff::diff_paths;
 use asciicolor::Colorize;
 use parse_int;
-use crate::{parse,asm::AsmStatement, hir::{HirProgram, HirDeclaration}};
+use crate::{parse,asm::AsmStatement, hir::HirProgram, tir::{TirProgram, TirDeclaration, TirConstant}};
 
 pub struct MAR {
     global_scope_size: Cell<u16>,
@@ -151,9 +151,13 @@ impl Target for MAR {
         'm'
     }
 
+    fn is_standard(&self) -> bool {
+        false
+    }
+
     // we made a hook into the hir program so we can include our 'std.mar.ok' file as if it were an include statement
     // this allows us to use the oak compile time features to generate the stdlib
-    fn extend_hir(&self, cwd: &PathBuf, hir: &mut HirProgram) {
+    fn extend_hir(&self, cwd: &PathBuf, constants: &mut BTreeMap<String, TirConstant>, hir: &mut HirProgram) {
         let is_std = hir.use_std();
         if is_std {
             self.is_std.set(is_std);
@@ -165,8 +169,16 @@ impl Target for MAR {
             path.push("std.mar.ok");
             path = path.canonicalize().unwrap();
             let diff = diff_paths(&path, &cwd_path).unwrap();
-            let mut decls = vec!(HirDeclaration::Include(String::from(diff.to_str().unwrap())));
-            hir.extend_declarations(&decls);
+            let mut decls = vec!(TirDeclaration::Include(String::from(diff.to_str().unwrap())));
+            let mut program = TirProgram::new(decls, 0);
+            match program.compile(cwd, constants) {
+                Ok(std_hir) => {
+                    hir.extend_declarations(std_hir.get_declarations());
+                }
+                Err(error) => {
+                    panic!(error);
+                }
+            }
         }
     }
 

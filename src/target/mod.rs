@@ -9,12 +9,13 @@ pub use ts::TS;
 
 use std::{collections::BTreeMap, path::PathBuf};
 use super::hir::{HirConstant, HirProgram};
+use super::tir::{TirConstant};
 
 pub trait Target {
     fn get_name(&self) -> char;
     fn is_standard(&self) -> bool;
 
-    fn extend_hir(&self, cwd: &PathBuf, hir: &mut HirProgram) {}
+    fn extend_hir(&self, cwd: &PathBuf, constants: &mut BTreeMap<String, TirConstant>, hir: &mut HirProgram) {}
 
     fn std(&self) -> String;
     fn core_prelude(&self) -> String;

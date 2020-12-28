@@ -1,9 +1,0 @@
-#[std]
-#[include("./src/target/std/mar/internal/debug.mar.ok")]
-#[include("./src/target/std/mar/internal/memory.mar.ok")]
-
-fn main() {
-    Internal::debugger();
-    Internal::set_address(57005, 48879);
-    Internal::debugger();
-}

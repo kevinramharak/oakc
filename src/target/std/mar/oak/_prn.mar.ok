@@ -2,9 +2,11 @@
 #[if(!is_defined("OAK_PRN")) {
     // include guard
     const OAK_PRN = 1;
+    
     // include dependencies
     #[include("../c/string.h.mar.ok")]
     #[include("../internal/comport.mar.ok")]
+
     // include asm implementation
     #[extern("_prn.mar")]
 }]

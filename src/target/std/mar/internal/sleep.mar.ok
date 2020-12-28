@@ -14,9 +14,7 @@
 "Suspends execution for this tick, returns execution to the caller on a future tick
 > calls any registered `before_sleep` handlers before suspending execution
 > calls any registered `after_sleep` handlers before returning execution")]
-    fn Internal::sleep() {
-        __internal_sleep!();
-    }
+    extern fn __internal_sleep as Internal::sleep();
 
     fn Internal::register_before_sleep() -> bool {
         return false;

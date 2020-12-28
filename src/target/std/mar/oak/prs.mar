@@ -5,8 +5,6 @@
 
 ;; #[ffi] void prs!(s)
 ;; pop a value off the stack and print it as a null terminated string
-;; #[dependency="../c/string.h.mar"] for `size_t __c_strlen(const char * str)`
-;; #[dependency="../mar/comport.mar"] for `void __mar_blocking_write_to_console(const char * str, size_t length)``
 ;; NOTE: we cannot use `puts` because it will print a '\n' at the end of the string
 prs:
 __oak_prs:

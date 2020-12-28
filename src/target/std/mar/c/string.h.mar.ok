@@ -13,7 +13,7 @@
 
     // include asm implementation
     #[extern("string.h.mar")]
-
+    /*
     // define ffi
     #[doc("Finds the first occurence of `needle` in `haystack` up till `length` amount of words. Returns a pointer to the found `needle` location or `NULL` if not found.")]
     fn C::memchr(haystack: &void, needle: char, length: num) -> &void {
@@ -136,5 +136,5 @@
 
     fn C::strtok() {
 
-    }
+    }*/
 }]

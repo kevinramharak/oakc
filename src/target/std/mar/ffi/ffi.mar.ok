@@ -1,10 +1,16 @@
 
-#[if(!is_defined("FFI")) {
+
+#[if(!is_defined("FFI_GUARD")) {
     // include guard
-    const FFI = 1;
+    const FFI_GUARD = 1;
 
     // include dependencies
 
     // include asm implementation
     #[extern("ffi.mar")]
+
+    extern fn __ffi_pass_arg_by_value(value: num);
+    extern fn __ffi_pass_arg_by_reference(reference: num);
+    extern fn __ffi_pass_return_value_as_value() -> num;
+    extern fn __ffi_pass_return_value_as_reference() -> num;
 }]

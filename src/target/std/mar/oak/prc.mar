@@ -5,7 +5,6 @@
 
 ;; #[ffi] void prc!(ch)
 ;; pop a value off the stack and print it as character
-;; #[dependency="../mar/comport.mar"] for `void __mar_blocking_write_to_console(const char * str, size_t length)``
 prc:
 __oak_prc:
     push BP

@@ -2,20 +2,26 @@
 #[if(!is_defined("INTERNAL_MEMORY")) {
     // include guard
     const INTERNAL_MEMORY = 1;
+
+    // dependencies
+    #[include("../ffi/ffi.mar.ok")]
     
     // assembly implementation
     #[extern("memory.mar")]
 
+    extern fn __internal_set_address();
+    extern fn __internal_get_address();
+
     // ffi
     fn Internal::set_address(address: num, value: num) {
-        __ffi_pass_arg_by_value!(value);
-        __ffi_pass_arg_by_value!(address);
-        __internal_set_address!();
+        __ffi_pass_arg_by_value(value);
+        __ffi_pass_arg_by_value(address);
+        __internal_set_address();
     }
 
     fn Internal::get_address(address: num) -> num {
-        __ffi_pass_arg_by_value!(address);
-        __internal_get_address!();
-        return __ffi_pass_return_value_as_value!() as num;
+        __ffi_pass_arg_by_value(address);
+        __internal_get_address();
+        return __ffi_pass_return_value_as_value() as num;
     }
 }]

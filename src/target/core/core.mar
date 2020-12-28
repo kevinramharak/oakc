@@ -10,7 +10,7 @@ org 0
 
 ;; data segment -
 ;; NOTE: the _0x00xx labels are just to help visualize the offsets
-;; NOTE: there are some static variables scattered trough the source, decide on what stays static inline and what can move to the data section
+;; TODO: there are some static variables scattered trough the source, decide on what stays static inline and what can move to the data section
 .data
 _0x0000:
     __core_interrupt_vector_table:
@@ -25,7 +25,7 @@ _0x0002:
 _0x0003:
     ;; NOTE: INT 3 is a special case for the server that starts the debugging mode.
     ;; NOTE: This memory location will never actually be used as a jump location for an interrupt
-    ;; TODO: use this location for a static variable so we dont waste its space
+    ;; TODO: maybe this location for a static variable so we dont waste these 16 bits
     ;; not implemented server
     __core_interrupt_break_point: dw __core_interrupt_handler_default
 _0x0004:
@@ -104,7 +104,7 @@ _0x00F8:
     ;; static const char * __core_panic_stack_underflow
     __core_panic_stack_underflow: dw "\nERR_STACK_UNDERFLOW", 0 ;; 21 length
     ;; static void * __core_jump_on_wake
-    __core_jump_on_wake: dw __core_initial_jump_on_wake ;; intial value is points to initialization, which makes the `jmp [__core_jump_on_wake]` a no-op
+    __core_jump_on_wake: dw __core_initial_jump_on_wake ;; intial value points to initialization routine, which makes the `jmp [__core_jump_on_wake]` a no-op
     ;; static size_t __core_execution_limit_reached_saved_sp
     __core_execution_limit_reached_saved_sp: dw 0
     ;; static size_t __core_execution_limit_reached_saved_bp
@@ -682,7 +682,8 @@ __core_exit_return:
     ret 1
 
 ;; #[entry] void __core_start()
-;; execution on a server tick always starts at .text with the registers and status flags reset
+;; execution on a server tick always starts at .text with the status flags reset
+;; see: https://github.com/simon987/Much-Assembly-Required/blob/refactor-1.6/src/main/java/net/simon987/mar/server/assembly/Status.java#L49
 ;; a server reset will also reset the memory and floppy contents
 .text
 __core_start:

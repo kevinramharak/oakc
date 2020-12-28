@@ -96,8 +96,8 @@ impl MAR {
         initializer_table_index += 1;
         destructor_table_index += 1;
         let initializers_length = initializers.len();
+        result.insert(initializer_table_index, String::from("    __core_initializer_vector_table_entries:"));
         if initializers_length > 0 {
-            result.insert(initializer_table_index, String::from("    __core_initializer_vector_table_entries:"));
             initializer_table_index += 1;
             destructor_table_index += 1;
             for initializer in initializers {
@@ -116,8 +116,8 @@ impl MAR {
         result.insert(destructor_table_index, format!("    __core_destructor_vector_table_length: dw {}", destructors.len()));
         destructor_table_index += 1;
         let destructors_length = destructors.len();
+        result.insert(destructor_table_index, String::from("    __core_destructor_vector_table_entries:"));
         if destructors_length > 0 {
-            result.insert(destructor_table_index, String::from("    __core_destructor_vector_table_entries:"));
             destructor_table_index += 1;
             for destructor in destructors {
                 result.insert(destructor_table_index, format!("    dw {}", destructor));
@@ -240,7 +240,7 @@ __core_main:")
         format!(r"
     push {} ;; push value on the vm stack
     call __core_machine_push",
-    n as i16)
+    n as u16)
     }
 
     fn add(&self) -> String {

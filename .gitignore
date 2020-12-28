@@ -1,8 +1,17 @@
+# project stuff
 /target
-/mar/*.mar
 Cargo.lock
 *.exe
+
+# editors
 .vscode
+
+# generated files
 main
-main.mar
 main.js
+main.go
+main.c
+
+# mar stuff
+main.mar
+/mar/*.mar
